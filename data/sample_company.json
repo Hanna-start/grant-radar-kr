@@ -1,0 +1,29 @@
+{
+  "company_id": "sample-tech-001",
+  "name": "샘플테크 주식회사",
+  "is_fictional": true,
+  "business_type": "corporation",
+  "established_date": "2022-03-15",
+  "headquarters_region": "서울특별시",
+  "business_locations": [
+    "서울특별시"
+  ],
+  "industry_codes": [
+    "J58222"
+  ],
+  "industry_names": [
+    "응용 소프트웨어 개발 및 공급업"
+  ],
+  "business_categories": [
+    "정보통신업"
+  ],
+  "employee_count": 12,
+  "representative_birth_date": null,
+  "certifications": [],
+  "research_institute": false,
+  "export_experience": false,
+  "revenue": null,
+  "tax_arrears": null,
+  "support_history": [],
+  "data_as_of": "2026-07-21"
+}
