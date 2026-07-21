@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 import httpx
 
@@ -60,7 +60,11 @@ class BadRequestError(KStartupApiError):
 
 
 class ServiceUnavailableError(KStartupApiError):
-    """API 내부 오류 또는 서비스 이용 불가."""
+    """API 내부 오류 또는 일시적 서비스 이용 불가."""
+
+
+class ServiceGoneError(KStartupApiError):
+    """해당 오픈 API 서비스가 없거나 폐기됨. 재시도 대상이 아니다."""
 
 
 class ResponseParseError(KStartupApiError):
@@ -93,9 +97,11 @@ def mask_secret(text: str, secret: str) -> str:
     if not secret:
         return text
     masked = text.replace(secret, "***")
-    encoded = quote(secret, safe="")
-    if encoded != secret:
-        masked = masked.replace(encoded, "***")
+    # httpx는 쿼리를 urlencode(quote_plus)로 인코딩하므로(공백→'+'),
+    # quote(safe="")와 quote_plus 두 변형을 모두 가린다.
+    for variant in (quote(secret, safe=""), quote_plus(secret)):
+        if variant != secret:
+            masked = masked.replace(variant, "***")
     return masked
 
 
@@ -124,7 +130,10 @@ def _error_for_code(code: int, message: str) -> KStartupApiError:
         return RateLimitError(text)
     if code == 10:
         return BadRequestError(text)
-    if code in (1, 12):
+    if code == 12:
+        # 서비스가 없거나 폐기된 영구적 상태 — 재시도해도 소용없다.
+        return ServiceGoneError(text)
+    if code == 1:
         return ServiceUnavailableError(text)
     return KStartupApiError(text)
 
@@ -135,6 +144,9 @@ def _parse_gateway_error(body_text: str) -> KStartupApiError | None:
     returnType=json을 요청해도 게이트웨이 수준 오류(인증 실패 등)는
     XML(OpenAPI_ServiceResponse)로 반환될 수 있다.
     body_text는 호출 측에서 인증키가 마스킹된 상태로 전달해야 한다.
+
+    오류 코드를 식별할 수 없는 본문(HTML 오류 페이지 등)은 None을 반환해
+    호출 측의 HTTP 상태 코드 분기에 맡긴다.
     """
     stripped = body_text.lstrip()
     if not stripped.startswith("<"):
@@ -145,9 +157,7 @@ def _parse_gateway_error(body_text: str) -> KStartupApiError | None:
         code_match = re.search(r"<resultCode>\s*(\d+)\s*</resultCode>", stripped)
         msg_match = re.search(r"<resultMsg>\s*([^<]*?)\s*</resultMsg>", stripped)
     if code_match is None:
-        return ResponseParseError(
-            f"XML 응답을 받았지만 오류 코드를 확인하지 못했습니다. (본문 일부: {stripped[:200]!r})"
-        )
+        return None
     code = int(code_match.group(1))
     if code == 0:
         # resultCode 00 등 성공 코드인데 XML이면 returnType이 반영되지 않은 경우다.
@@ -176,6 +186,8 @@ class KStartupClient:
     ) -> None:
         if not api_key:
             raise ValueError("api_key가 비어 있습니다.")
+        if max_retries < 0:
+            raise ValueError("max_retries는 0 이상이어야 합니다.")
         self._api_key = api_key
         self._max_retries = max_retries
         self._retry_wait = retry_wait
@@ -225,25 +237,33 @@ class KStartupClient:
             page,
             per_page,
         )
+        # 원본 httpx 예외는 인증키가 포함된 URL을 갖고 있다. except 블록 안에서
+        # raise하면 새 예외의 __context__에 원본이 남으므로(from None은 표시만 억제),
+        # 마스킹된 오류를 만들어 두고 except 블록이 끝난 뒤에 raise한다.
+        transport_error: KStartupApiError | None = None
         try:
             response = self._client.get(ANNOUNCEMENT_PATH, params=params)
         except httpx.TimeoutException as exc:
-            # `from None`: 원본 예외에 인증키가 포함된 URL이 남는 것을 차단한다.
-            raise RequestTimeoutError(
+            transport_error = RequestTimeoutError(
                 f"요청 시간 초과: {type(exc).__name__}: {self._mask(str(exc))}"
-            ) from None
+            )
         except httpx.HTTPError as exc:
-            raise NetworkError(
+            transport_error = NetworkError(
                 f"네트워크 오류: {type(exc).__name__}: {self._mask(str(exc))}"
-            ) from None
+            )
+        if transport_error is not None:
+            raise transport_error
 
         safe_text = self._mask(response.text)
 
+        # 게이트웨이 오류(인증 실패 등)는 상태 코드와 무관하게 XML로 올 수 있으므로
+        # 코드가 식별되는 경우 상태 코드보다 우선해 정확한 오류로 분류한다.
         gateway_error = _parse_gateway_error(safe_text)
         if gateway_error is not None:
             raise gateway_error
 
         if response.status_code >= 500:
+            # HTML 오류 페이지를 포함한 일시적 서버 오류 — 재시도 대상.
             raise ServiceUnavailableError(
                 f"서버 오류: HTTP {response.status_code} (본문 일부: {safe_text[:200]!r})"
             )
@@ -253,12 +273,23 @@ class KStartupClient:
                 f"(본문 일부: {safe_text[:200]!r})"
             )
 
-        try:
-            data = json.loads(response.text)
-        except json.JSONDecodeError as exc:
+        if safe_text.lstrip().startswith("<"):
             raise ResponseParseError(
+                f"XML/HTML 응답을 받았지만 오류 코드를 확인하지 못했습니다. "
+                f"(본문 일부: {safe_text[:200]!r})"
+            )
+
+        # 파싱도 마스킹된 본문 기준으로 한다. 서버가 요청 매개변수(ServiceKey)를
+        # 본문에 되돌려주는 경우에도 data와 저장 파일에 키가 남지 않도록 하기 위함이다.
+        parse_error: KStartupApiError | None = None
+        try:
+            data = json.loads(safe_text)
+        except json.JSONDecodeError as exc:
+            parse_error = ResponseParseError(
                 f"JSON 파싱 실패: {exc.msg} (본문 일부: {safe_text[:200]!r})"
-            ) from None
+            )
+        if parse_error is not None:
+            raise parse_error
 
         return FetchResult(
             page=page,

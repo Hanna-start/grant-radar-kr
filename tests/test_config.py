@@ -69,6 +69,19 @@ def test_load_settings_empty_value_raises(tmp_path, monkeypatch):
         load_settings(project_root=tmp_path)
 
 
+def test_parse_env_file_utf16_gives_config_error(tmp_path):
+    # PowerShell 5.1의 `>` 리다이렉션은 UTF-16으로 저장될 수 있다
+    env = tmp_path / ".env"
+    env.write_bytes(f"KSTARTUP_API_KEY={FAKE_KEY}\n".encode("utf-16"))
+    with pytest.raises(ConfigError) as exc_info:
+        parse_env_file(env)
+    assert "UTF-8" in str(exc_info.value)
+    assert FAKE_KEY not in str(exc_info.value)
+    # 예외 체인에 원문 바이트를 가진 UnicodeDecodeError가 남지 않아야 한다
+    assert exc_info.value.__cause__ is None
+    assert exc_info.value.__context__ is None
+
+
 def test_settings_repr_masks_key():
     settings = Settings(api_key=FAKE_KEY)
     assert FAKE_KEY not in repr(settings)

@@ -26,11 +26,28 @@ class ConfigError(Exception):
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
-    """단순 .env 파서. `KEY=VALUE` 형식과 `#` 주석만 지원한다."""
+    """단순 .env 파서. `KEY=VALUE` 형식과 줄 단위 `#` 주석만 지원한다.
+
+    값 뒤에 붙는 인라인 주석(`KEY=값 # 설명`)은 지원하지 않으며 값의 일부로
+    취급된다. 파일은 UTF-8(BOM 허용)이어야 한다.
+    """
     values: dict[str, str] = {}
     if not path.is_file():
         return values
-    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+    # UnicodeDecodeError는 .object에 파일 원문 바이트(인증키 포함 가능)를 담으므로
+    # 예외 체인(__context__)에 남지 않도록 except 블록 밖에서 ConfigError를 raise한다.
+    content: str | None = None
+    try:
+        content = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    if content is None:
+        # PowerShell 5.1의 `>` 리다이렉션은 UTF-16으로 저장하는 경우가 있다.
+        raise ConfigError(
+            f"{path.name} 파일을 UTF-8로 읽을 수 없습니다.\n"
+            "파일을 UTF-8 인코딩으로 다시 저장하세요 (메모장: 다른 이름으로 저장 → 인코딩 UTF-8)."
+        )
+    for raw_line in content.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

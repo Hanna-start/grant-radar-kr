@@ -62,7 +62,7 @@ def save_raw_result(result: FetchResult, raw_dir: Path) -> Path:
     return path
 
 
-def run_fetch(args: argparse.Namespace) -> int:
+def run_fetch(args: argparse.Namespace, client_factory=KStartupClient) -> int:
     try:
         settings = load_settings()
     except ConfigError as exc:
@@ -70,7 +70,7 @@ def run_fetch(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        with KStartupClient(settings.api_key) as client:
+        with client_factory(settings.api_key) as client:
             result = client.fetch_announcements_page(page=args.page, per_page=args.per_page)
     except KStartupApiError as exc:
         print(f"[오류] {exc}", file=sys.stderr)
@@ -101,6 +101,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # 출력이 파이프/파일로 리다이렉트되면 Windows에서 cp949가 사용될 수 있다.
+    # 공고 본문에 cp949로 표현 불가한 문자가 있어도 크래시하지 않도록 한다.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     args = build_parser().parse_args(argv)
     if args.command == "fetch":
