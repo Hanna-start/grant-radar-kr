@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from grant_radar.models.decision import Confidence, Decision, RuleResult, RuleStatus
+from grant_radar.rules.age import AgeRule
 from grant_radar.rules.applicant_type import ApplicantTypeRule
 from grant_radar.rules.business_age import BusinessAgeRule
 from grant_radar.rules.region import RegionRule, load_region_mapping
@@ -15,7 +16,12 @@ from tests.factories import make_announcement, make_company
 from tests.test_normalization import full_item
 
 MAPPING_PATH = Path(__file__).parent.parent / "data" / "reference" / "region_mapping.json"
-RULES = [RegionRule(load_region_mapping(MAPPING_PATH)), BusinessAgeRule(), ApplicantTypeRule()]
+RULES = [
+    RegionRule(load_region_mapping(MAPPING_PATH)),
+    BusinessAgeRule(),
+    ApplicantTypeRule(),
+    AgeRule(),
+]
 AS_OF = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
 
 
@@ -92,7 +98,7 @@ class TestEvaluateAnnouncement:
         )
         evaluation = evaluate_announcement(announcement, make_company(), RULES, AS_OF)
         assert evaluation.decision == Decision.ELIGIBLE
-        assert len(evaluation.rule_results) == 3
+        assert len(evaluation.rule_results) == 4
         assert all(r.reason for r in evaluation.rule_results)  # 근거 없는 결과 금지
 
     def test_region_mismatch_is_ineligible_with_reason(self):
@@ -138,6 +144,21 @@ class TestEvaluateAnnouncement:
         announcement = make_announcement(supt_regin="부산", biz_enyy=None)
         evaluation = evaluate_announcement(announcement, make_company(), RULES, AS_OF)
         assert evaluation.human_checks
+
+    def test_youth_only_announcement_is_review_not_eligible(self):
+        # 표본 검증(2026-07-21)에서 발견된 오판 회귀 테스트:
+        # 청년 전용 공고(만 20세 이상 ~ 만 39세 이하)가 대표자 생년월일 정보
+        # 없이 ELIGIBLE로 통과되면 안 된다
+        announcement = make_announcement(
+            supt_regin="전국",
+            biz_enyy="10년미만",
+            aply_trgt="일반기업",
+            biz_trgt_age="만 20세 이상 ~ 만 39세 이하",
+        )
+        evaluation = evaluate_announcement(announcement, make_company(), RULES, AS_OF)
+        assert evaluation.decision == Decision.REVIEW_REQUIRED
+        age = next(r for r in evaluation.rule_results if r.rule_id == "age.v1")
+        assert age.status == RuleStatus.REVIEW
 
 
 class TestEvaluateStored:

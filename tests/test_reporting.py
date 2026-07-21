@@ -9,6 +9,7 @@ from grant_radar.reporting.console import (
     render_console_report,
     render_markdown_report,
 )
+from grant_radar.rules.age import AgeRule
 from grant_radar.rules.applicant_type import ApplicantTypeRule
 from grant_radar.rules.business_age import BusinessAgeRule
 from grant_radar.rules.region import RegionRule, load_region_mapping
@@ -17,7 +18,12 @@ from grant_radar.services.evaluation import evaluate_announcement
 from tests.factories import make_announcement, make_company
 
 MAPPING_PATH = Path(__file__).parent.parent / "data" / "reference" / "region_mapping.json"
-RULES = [RegionRule(load_region_mapping(MAPPING_PATH)), BusinessAgeRule(), ApplicantTypeRule()]
+RULES = [
+    RegionRule(load_region_mapping(MAPPING_PATH)),
+    BusinessAgeRule(),
+    ApplicantTypeRule(),
+    AgeRule(),
+]
 AS_OF = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
 
 
@@ -39,12 +45,14 @@ class TestAnnouncementBlock:
         assert "[판정] 지원 가능" in text
         assert "[공고명]" in text
         assert "[주관기관] 가상진흥원" in text
+        assert "[지원분야] 사업화" in text
         assert "[접수기간] 2026-07-01 ~ 2026-07-31" in text
         assert "[상세페이지] https://example.test/view?pbancSn=900001" in text
         assert "확인된 조건" in text
         assert "- 지역: 통과" in text
         assert "- 업력: 통과" in text
         assert "- 신청자 유형: 통과" in text
+        assert "- 대표자 연령: 통과" in text
         assert "판단 사유:" in text
         assert "추가 검토 사항" in text
         assert "중복수혜 제한" in text

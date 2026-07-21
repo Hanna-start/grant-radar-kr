@@ -27,6 +27,7 @@ from grant_radar.models.decision import (
     RuleStatus,
 )
 from grant_radar.normalization.kstartup import normalize_announcement
+from grant_radar.rules.age import AgeRule
 from grant_radar.rules.applicant_type import ApplicantTypeRule
 from grant_radar.rules.base import Rule
 from grant_radar.rules.business_age import BusinessAgeRule
@@ -34,12 +35,13 @@ from grant_radar.rules.region import RegionRule, load_region_mapping
 from grant_radar.services.ingestion import KST, is_closed
 from grant_radar.storage.sqlite import AnnouncementStore
 
-# FAIL(HIGH)이 전체 INELIGIBLE로 이어질 수 있는 규칙 (docs/eligibility-rules.md 참고)
+# FAIL(HIGH)이 전체 INELIGIBLE로 이어질 수 있는 규칙 (docs/eligibility-rules.md 참고).
+# age.v1은 기준일 부재로 FAIL을 내지 않으므로 목록에 없다.
 AUTO_EXCLUDE_RULE_IDS = frozenset({"region.v1", "business_age.v1", "applicant_type.v1"})
 
 
 def default_rules() -> list[Rule]:
-    return [RegionRule(load_region_mapping()), BusinessAgeRule(), ApplicantTypeRule()]
+    return [RegionRule(load_region_mapping()), BusinessAgeRule(), ApplicantTypeRule(), AgeRule()]
 
 
 def decide(rule_results: Sequence[RuleResult]) -> Decision:

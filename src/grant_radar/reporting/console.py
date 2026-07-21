@@ -30,6 +30,7 @@ RULE_LABELS = {
     "region.v1": "지역",
     "business_age.v1": "업력",
     "applicant_type.v1": "신청자 유형",
+    "age.v1": "대표자 연령",
 }
 
 STATUS_LABELS = {
@@ -102,6 +103,8 @@ def render_announcement_block(evaluation: EvaluationResult) -> list[str]:
     ]
     if ann.organization_name:
         lines.append(f"[주관기관] {ann.organization_name}")
+    if ann.support_category:
+        lines.append(f"[지원분야] {ann.support_category}")
     lines.append(
         f"[접수기간] {_format_date(ann.application_start_at)}"
         f" ~ {_format_date(ann.application_end_at)}"

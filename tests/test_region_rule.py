@@ -36,6 +36,11 @@ class TestPass:
         result = evaluate("수도권")
         assert result.status == RuleStatus.PASS
 
+    def test_combined_region_token_resolves_for_matching_company(self):
+        # 실제 관찰(표본 100건): supt_regin="전남광주" 결합 표현
+        result = evaluate("전남광주", headquarters_region="광주광역시")
+        assert result.status == RuleStatus.PASS
+
     def test_pass_even_with_extra_unresolved_token(self):
         # 해석 불가 토큰은 허용 범위를 넓힐 뿐이므로 본점 일치가 확인되면 PASS
         result = evaluate("서울,해외거점")
@@ -53,6 +58,11 @@ class TestFail:
 
     def test_non_metropolitan_group_mismatch(self):
         result = evaluate("비수도권")
+        assert result.status == RuleStatus.FAIL
+
+    def test_combined_region_token_fails_for_seoul_company(self):
+        # 표본 검증 전에는 매핑 누락으로 REVIEW였던 사례 — 매핑 추가 후 명확 판정
+        result = evaluate("전남광주")
         assert result.status == RuleStatus.FAIL
 
 
