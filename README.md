@@ -162,3 +162,7 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 
 첨부파일 수집·텍스트 추출, 상세 검토 항목 추출, 알림(이메일/Slack) 등은
 1차 판정이 검증된 후 단계적으로 검토합니다.
+
+## 라이선스
+
+[MIT License](LICENSE)
