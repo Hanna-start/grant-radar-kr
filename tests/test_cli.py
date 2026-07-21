@@ -3,6 +3,7 @@
 import argparse
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 import pytest
@@ -127,6 +128,90 @@ def test_run_fetch_api_error_exits_1_without_key(tmp_path, monkeypatch, capsys):
     assert "[오류]" in captured.err
     assert "30" in captured.err
     assert FAKE_KEY not in captured.err
+
+
+def prepare_project_files(tmp_path):
+    """evaluate가 기본 경로에서 찾는 참조 파일을 임시 작업 폴더에 복사한다."""
+    import shutil
+
+    repo_root = Path(__file__).parent.parent
+    (tmp_path / "data" / "reference").mkdir(parents=True)
+    shutil.copy(repo_root / "data" / "sample_company.json", tmp_path / "data")
+    shutil.copy(
+        repo_root / "data" / "reference" / "region_mapping.json",
+        tmp_path / "data" / "reference",
+    )
+
+
+def test_evaluate_end_to_end(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        # 업력 조건은 의도적으로 생략 (NOT_APPLICABLE) —
+                        # 실행 시점에 따라 판정이 달라지지 않도록 한다
+                        "pbanc_sn": 1,
+                        "biz_pbanc_nm": "전국 가상 공고",
+                        "supt_regin": "전국",
+                        "aply_trgt": "일반기업",
+                        "pbanc_rcpt_bgng_dt": "20990701",
+                        "pbanc_rcpt_end_dt": "20990731",
+                        "rcrt_prgs_yn": "Y",
+                    },
+                    {
+                        "pbanc_sn": 2,
+                        "biz_pbanc_nm": "부산 한정 가상 공고",
+                        "supt_regin": "부산",
+                        "aply_trgt": "일반기업",
+                        "pbanc_rcpt_bgng_dt": "20990701",
+                        "pbanc_rcpt_end_dt": "20990731",
+                        "rcrt_prgs_yn": "Y",
+                    },
+                ]
+            },
+        )
+
+    run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))
+    capsys.readouterr()
+
+    exit_code = main(["evaluate"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "[판정 요약]" in captured.out
+    assert "지원 가능 1" in captured.out
+    assert "지원 불가 1" in captured.out
+    # 지원 가능 공고가 먼저 표시된다 (지시서 19절 정렬)
+    assert captured.out.index("전국 가상 공고") < captured.out.index("부산 한정 가상 공고")
+    # 제외 결과에도 이유가 표시된다
+    assert "포함되지 않습니다" in captured.out
+
+
+def test_evaluate_without_db_guides_user(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+    exit_code = main(["evaluate"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "fetch" in captured.err
+
+
+def test_evaluate_rejects_non_fictional_company(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+    company_path = tmp_path / "data" / "sample_company.json"
+    data = json.loads(company_path.read_text(encoding="utf-8"))
+    data["is_fictional"] = False
+    company_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    exit_code = main(["evaluate"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "실제 기업정보" in captured.err
 
 
 def test_save_raw_result_excludes_service_key(tmp_path):

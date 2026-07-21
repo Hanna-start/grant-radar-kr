@@ -59,6 +59,9 @@ class NormalizedAnnouncement:
     application_methods: list[ApplicationMethod]
     business_age_conditions: list[str]
     applicant_age_conditions: list[str]
+    # 신청 대상 범주 (실제 관찰: aply_trgt = "청소년,대학생,일반인,..." 쉼표 구분).
+    # 신청자 유형 규칙의 입력으로 쓰기 위해 기본 모델에 추가했다.
+    applicant_categories: list[str]
     # 실제 값 형태 미관찰(표본에서 전부 null) — 해석하지 않고 텍스트로 보존한다
     preferred_conditions: str | None
     recruitment_open: bool | None

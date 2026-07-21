@@ -8,18 +8,29 @@
 4. 확인되지 않은 API 기능을 추측하지 않는다.
 5. 공개 데이터와 내부 데이터(인증키, 실제 회사 정보)를 분리한다.
 
-## 현재 구성 (4단계까지)
+## 현재 구성 (5단계까지)
 
 ```
 grant_radar/
 ├─ config.py                  # .env / 환경변수 로딩, 인증키 마스킹된 Settings
 ├─ api/kstartup.py            # K-Startup API 클라이언트 (한 페이지 조회, 오류 분류, 재시도)
-├─ models/announcement.py     # 정규화 공고 모델 (DateField, ApplicationMethod 포함)
+├─ models/
+│  ├─ announcement.py         # 정규화 공고 모델 (DateField, ApplicationMethod 포함)
+│  ├─ company.py              # 가상회사 모델 (is_fictional=true 강제)
+│  └─ decision.py             # RuleResult / EvaluationResult (근거 필수)
 ├─ normalization/kstartup.py  # 원본 응답 → 내부 모델 (실제 관찰 기반)
+├─ rules/                     # 결정론적 1차 규칙 (region / business_age / applicant_type)
 ├─ storage/sqlite.py          # SQLite 저장, 해시 기반 변경 감지 (previous_hash 보존)
-├─ services/ingestion.py      # 수집 오케스트레이션: 정규화 → 저장 → 변경/마감 판별
-└─ __main__.py                # CLI: fetch (조회 + 원본 저장 + 수집 + 상태 보고)
+├─ services/
+│  ├─ ingestion.py            # 수집: 정규화 → 저장 → 변경/마감 판별
+│  └─ evaluation.py           # 판정: 규칙 실행 → 전체 판정 (자동 제외 목록 관리)
+└─ __main__.py                # CLI: fetch / evaluate
 ```
+
+참조 데이터:
+
+- `data/sample_company.json` — 가상회사 (실존 기업 아님)
+- `data/reference/region_mapping.json` — 지역 매핑표 (시도명 별칭, 수도권 등 그룹)
 
 데이터 흐름:
 

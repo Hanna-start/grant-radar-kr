@@ -18,12 +18,29 @@ from typing import Any
 
 from grant_radar.api.kstartup import FetchResult, KStartupApiError, KStartupClient
 from grant_radar.config import ConfigError, load_settings
+from grant_radar.models.company import CompanyDataError, load_company
+from grant_radar.models.decision import Decision, EvaluationResult
 from grant_radar.normalization.kstartup import NormalizationError
+from grant_radar.services.evaluation import evaluate_stored
 from grant_radar.services.ingestion import IngestOutcome, ingest_page
 from grant_radar.storage.sqlite import AnnouncementStore
 
 RAW_DIR = Path("data") / "raw"
 DB_PATH = Path("data") / "announcements.db"
+DEFAULT_COMPANY_PATH = Path("data") / "sample_company.json"
+
+DECISION_LABELS = {
+    Decision.ELIGIBLE: "지원 가능",
+    Decision.REVIEW_REQUIRED: "판단 필요",
+    Decision.INELIGIBLE: "지원 불가",
+}
+
+# 판정별 표시 우선순위 (지시서 19절). 마감 공고는 맨 뒤로 보낸다.
+DECISION_ORDER = {
+    Decision.ELIGIBLE: 0,
+    Decision.REVIEW_REQUIRED: 1,
+    Decision.INELIGIBLE: 2,
+}
 
 
 def summarize_top_level(data: Any) -> list[str]:
@@ -117,6 +134,79 @@ def format_ingest_summary(outcomes: list[IngestOutcome], total_stored: int) -> s
     )
 
 
+def sort_key(evaluation: EvaluationResult):
+    """판정 우선순위 → 마감 임박 순 (지시서 19절)."""
+    end_date = evaluation.announcement.application_end_at.value
+    return (
+        1 if evaluation.closed else 0,
+        DECISION_ORDER.get(evaluation.decision, 9),
+        end_date.toordinal() if end_date is not None else 10**9,
+    )
+
+
+def run_evaluate(args: argparse.Namespace) -> int:
+    try:
+        company = load_company(args.company)
+    except CompanyDataError as exc:
+        print(f"[오류] {exc}", file=sys.stderr)
+        return 1
+
+    if not DB_PATH.is_file():
+        print(
+            "저장된 공고가 없습니다. 먼저 fetch를 실행하세요: python -m grant_radar fetch",
+            file=sys.stderr,
+        )
+        return 1
+
+    with AnnouncementStore(DB_PATH) as store:
+        evaluations = evaluate_stored(store, company)
+
+    if not evaluations:
+        print("저장된 공고가 없습니다. 먼저 fetch를 실행하세요.", file=sys.stderr)
+        return 1
+
+    evaluations.sort(key=sort_key)
+
+    counts = {decision: 0 for decision in Decision}
+    closed_count = 0
+    for evaluation in evaluations:
+        counts[evaluation.decision] += 1
+        if evaluation.closed:
+            closed_count += 1
+    print(
+        f"[판정 요약] 회사: {company.name} ({company.company_id}, 가상회사) / "
+        f"공고 {len(evaluations)}건 — "
+        f"지원 가능 {counts[Decision.ELIGIBLE]}, "
+        f"판단 필요 {counts[Decision.REVIEW_REQUIRED]}, "
+        f"지원 불가 {counts[Decision.INELIGIBLE]}, 마감 {closed_count}"
+    )
+
+    for evaluation in evaluations:
+        ann = evaluation.announcement
+        label = DECISION_LABELS[evaluation.decision]
+        if evaluation.closed:
+            label += " · 마감"
+        print(f"\n[판정] {label}")
+        print(f"[공고명] {ann.title or '(제목 없음)'} (공고번호 {ann.source_id})")
+        start = ann.application_start_at.value or ann.application_start_at.raw or "?"
+        end = ann.application_end_at.value or ann.application_end_at.raw or "?"
+        print(f"[접수기간] {start} ~ {end}")
+        if ann.detail_url:
+            print(f"[상세페이지] {ann.detail_url}")
+        for result in evaluation.rule_results:
+            print(f"  - {result.rule_id}: {result.status.value} — {result.reason}")
+            if result.announcement_value is not None:
+                print(f"      공고 조건: {result.announcement_value}")
+            if result.company_value is not None:
+                print(f"      회사 정보: {result.company_value}")
+        checks = evaluation.human_checks
+        if checks:
+            print("  추가 확인 사항:")
+            for check in checks:
+                print(f"    - {check}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="grant_radar",
@@ -128,6 +218,15 @@ def build_parser() -> argparse.ArgumentParser:
     fetch_parser.add_argument("--page", type=int, default=1, help="페이지 번호 (기본 1)")
     fetch_parser.add_argument("--per-page", type=int, default=5, help="페이지당 결과 수 (기본 5)")
     fetch_parser.add_argument("--no-save", action="store_true", help="원본 응답을 저장하지 않음")
+
+    evaluate_parser = sub.add_parser(
+        "evaluate", help="저장된 공고를 가상회사 기준으로 1차 판정 (API 호출 없음)"
+    )
+    evaluate_parser.add_argument(
+        "--company",
+        default=str(DEFAULT_COMPANY_PATH),
+        help=f"회사 데이터 JSON 경로 (기본 {DEFAULT_COMPANY_PATH})",
+    )
     return parser
 
 
@@ -141,6 +240,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "fetch":
         return run_fetch(args)
+    if args.command == "evaluate":
+        return run_evaluate(args)
     return 2
 
 

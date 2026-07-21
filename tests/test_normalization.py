@@ -79,6 +79,7 @@ class TestFullItem:
         assert [m.method for m in ann.application_methods] == ["online"]
         assert ann.business_age_conditions == ["예비창업자", "1년미만", "2년미만", "3년미만"]
         assert ann.applicant_age_conditions == ["만 20세 이상 ~ 만 39세 이하", "만 40세 이상"]
+        assert ann.applicant_categories == ["일반인", "일반기업"]
         assert ann.preferred_conditions is None
         assert ann.recruitment_open is True
         assert ann.integrated_announcement is False
