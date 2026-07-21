@@ -16,7 +16,7 @@ K-Startup 공개 데이터를 수집하고, 가상회사의 객관적 조건과 
 
 ## 현재 개발 단계
 
-**6단계: 보고서 완료** — 다음: 표본 검증(7단계)
+**7단계: 표본 검증 완료** — 초기 MVP 완료 기준 충족
 
 - [x] 프로젝트 구조 및 설정
 - [x] K-Startup API 클라이언트 최소 구현 (한 페이지 조회)
@@ -28,7 +28,8 @@ K-Startup 공개 데이터를 수집하고, 가상회사의 객관적 조건과 
 - [x] 가상회사 데이터와 1차 판정 규칙 (지역, 업력, 신청자 유형) →
   [docs/eligibility-rules.md](docs/eligibility-rules.md)
 - [x] 판정 근거를 포함한 보고서 (`evaluate`, `run`, Markdown 저장)
-- [ ] 표본 검증 (규칙 판정과 수동 판정 비교)
+- [x] 표본 검증 (실제 공고 100건, 규칙 판정과 수동 판정 비교) →
+  [docs/validation-sample.md](docs/validation-sample.md)
 
 ## 데이터 원천
 
