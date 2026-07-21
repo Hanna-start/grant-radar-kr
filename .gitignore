@@ -1,0 +1,19 @@
+# 비밀정보 - 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+
+# 데이터
+*.db
+data/raw/
