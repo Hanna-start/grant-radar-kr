@@ -17,3 +17,4 @@ dist/
 # 데이터
 *.db
 data/raw/
+reports/

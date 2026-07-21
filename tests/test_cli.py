@@ -214,6 +214,65 @@ def test_evaluate_rejects_non_fictional_company(tmp_path, monkeypatch, capsys):
     assert "실제 기업정보" in captured.err
 
 
+def test_evaluate_report_writes_markdown(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={"data": [{"pbanc_sn": 1, "biz_pbanc_nm": "가상 공고", "supt_regin": "전국"}]},
+        )
+
+    run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))
+    capsys.readouterr()
+
+    exit_code = main(["evaluate", "--report", "reports/test-report.md"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "[보고서]" in captured.out
+    report = (tmp_path / "reports" / "test-report.md").read_text(encoding="utf-8")
+    assert report.startswith("# Grant Radar KR 판정 보고서")
+    assert "가상 공고" in report
+    assert FAKE_KEY not in report
+
+
+def test_run_command_fetches_and_evaluates(tmp_path, monkeypatch, capsys):
+    from grant_radar.__main__ import run_run
+
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "pbanc_sn": 1,
+                        "biz_pbanc_nm": "전국 가상 공고",
+                        "supt_regin": "전국",
+                        "aply_trgt": "일반기업",
+                    }
+                ]
+            },
+        )
+
+    args = fetch_args(
+        no_save=True,
+        company=str(tmp_path / "data" / "sample_company.json"),
+        report="reports/run-report.md",
+    )
+    exit_code = run_run(args, client_factory=make_factory(handler))
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "[수집] 신규 1건" in captured.out
+    assert "[판정 요약]" in captured.out
+    assert (tmp_path / "reports" / "run-report.md").is_file()
+
+
 def test_save_raw_result_excludes_service_key(tmp_path):
     result = make_result({"currentCount": 1, "data": [{"pbanc_sn": "1"}]})
     path = save_raw_result(result, tmp_path)

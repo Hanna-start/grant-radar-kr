@@ -24,7 +24,8 @@ grant_radar/
 ├─ services/
 │  ├─ ingestion.py            # 수집: 정규화 → 저장 → 변경/마감 판별
 │  └─ evaluation.py           # 판정: 규칙 실행 → 전체 판정 (자동 제외 목록 관리)
-└─ __main__.py                # CLI: fetch / evaluate
+├─ reporting/console.py       # 19절 형식 보고서 (콘솔 + Markdown 파일)
+└─ __main__.py                # CLI: fetch / evaluate / run
 ```
 
 참조 데이터:
