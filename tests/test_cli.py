@@ -68,14 +68,32 @@ def test_run_fetch_success_saves_and_summarizes(tmp_path, monkeypatch, capsys):
     assert exit_code == 0
     assert "[성공]" in captured.out
     assert "data 항목 수: 1" in captured.out
+    assert "[수집] 신규 1건" in captured.out
     saved = list((tmp_path / "data" / "raw").glob("*.json"))
     assert len(saved) == 1
     saved_text = saved[0].read_text(encoding="utf-8")
     assert FAKE_KEY not in saved_text
     assert "ServiceKey" not in saved_text
+    assert (tmp_path / "data" / "announcements.db").exists()
 
 
-def test_run_fetch_no_save_flag(tmp_path, monkeypatch, capsys):
+def test_run_fetch_twice_reports_unchanged(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+
+    def handler(request):
+        return httpx.Response(200, json={"data": [{"pbanc_sn": 1, "biz_pbanc_nm": "공고"}]})
+
+    run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))
+    capsys.readouterr()
+    exit_code = run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "동일 1건" in captured.out
+    assert "저장소 누적 1건" in captured.out
+
+
+def test_run_fetch_no_save_flag_skips_raw_but_still_ingests(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
     monkeypatch.chdir(tmp_path)
 
@@ -84,7 +102,8 @@ def test_run_fetch_no_save_flag(tmp_path, monkeypatch, capsys):
 
     exit_code = run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))
     assert exit_code == 0
-    assert not (tmp_path / "data").exists()
+    assert not (tmp_path / "data" / "raw").exists()  # 원본 저장만 생략
+    assert (tmp_path / "data" / "announcements.db").exists()  # 수집 DB는 유지
 
 
 def test_run_fetch_api_error_exits_1_without_key(tmp_path, monkeypatch, capsys):

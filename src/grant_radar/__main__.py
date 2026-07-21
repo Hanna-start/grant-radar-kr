@@ -18,8 +18,12 @@ from typing import Any
 
 from grant_radar.api.kstartup import FetchResult, KStartupApiError, KStartupClient
 from grant_radar.config import ConfigError, load_settings
+from grant_radar.normalization.kstartup import NormalizationError
+from grant_radar.services.ingestion import IngestOutcome, ingest_page
+from grant_radar.storage.sqlite import AnnouncementStore
 
 RAW_DIR = Path("data") / "raw"
+DB_PATH = Path("data") / "announcements.db"
 
 
 def summarize_top_level(data: Any) -> list[str]:
@@ -83,7 +87,34 @@ def run_fetch(args: argparse.Namespace, client_factory=KStartupClient) -> int:
     if not args.no_save:
         path = save_raw_result(result, RAW_DIR)
         print(f"[저장] {path}")
+
+    try:
+        with AnnouncementStore(DB_PATH) as store:
+            outcomes = ingest_page(store, result.data, fetched_at=result.fetched_at)
+            total = store.count()
+    except NormalizationError as exc:
+        print(f"[오류] 정규화 실패: {exc}", file=sys.stderr)
+        return 1
+
+    print(format_ingest_summary(outcomes, total))
+    for outcome in outcomes:
+        if outcome.change in ("NEW", "UPDATED"):
+            ann = outcome.announcement
+            marker = " (마감)" if outcome.closed else ""
+            print(f"  {outcome.change}: [{ann.source_id}] {ann.title}{marker}")
     return 0
+
+
+def format_ingest_summary(outcomes: list[IngestOutcome], total_stored: int) -> str:
+    def count(change: str) -> int:
+        return sum(1 for o in outcomes if o.change == change)
+
+    closed = sum(1 for o in outcomes if o.closed)
+    return (
+        f"[수집] 신규 {count('NEW')}건, 변경 {count('UPDATED')}건, "
+        f"동일 {count('UNCHANGED')}건, 판단불가 {count('UNKNOWN')}건, "
+        f"마감 {closed}건 (저장소 누적 {total_stored}건)"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
