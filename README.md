@@ -105,6 +105,29 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 
 모든 테스트는 모의(Mock) HTTP 응답을 사용하며 실제 API를 호출하지 않습니다.
 
+## 재현성 검증 (같은 입력 → 같은 결론)
+
+판정 경로에는 랜덤·언어모델이 없어 결정론적입니다. 이를 상시 확인하는
+장치가 세 가지 있습니다:
+
+1. **골든 스냅샷** (`tests/test_golden.py`): 가상 공고 표본 12건(판정 경로
+   전부 커버)의 기대 판정을 `tests/golden_expected.json`에 고정. 규칙 변경으로
+   결론이 바뀌면 테스트가 diff로 드러냅니다. 의도된 변경이면
+   `$env:UPDATE_GOLDEN="1"`로 재생성 후 diff를 검토·커밋합니다.
+2. **독립 구현 크로스체크** (`scripts/cross_check.py`): grant_radar 코드를
+   사용하지 않는 별도 로직으로 저장된 전체 공고를 재판정해 파이프라인과
+   전수 대조합니다 (종료 코드 0=일치).
+
+   ```powershell
+   .venv\Scripts\python.exe scripts\cross_check.py
+   ```
+
+3. **JSON 출력** (`evaluate --json PATH`): 판정 결과를 기계가 읽는 형식으로
+   저장해 실행 간 diff 비교나 외부 검토에 사용할 수 있습니다.
+
+마감 여부 표시만 실행 시각(KST)에 의존하며, 자격 판정 결론은 저장된 원본
+스냅샷·회사 데이터·규칙 버전에 의해서만 결정됩니다.
+
 ## 판정 상태
 
 | 상태 | 의미 |

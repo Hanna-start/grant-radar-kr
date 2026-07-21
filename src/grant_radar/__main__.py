@@ -21,7 +21,11 @@ from grant_radar.api.kstartup import FetchResult, KStartupApiError, KStartupClie
 from grant_radar.config import ConfigError, load_settings
 from grant_radar.models.company import CompanyDataError, load_company
 from grant_radar.normalization.kstartup import NormalizationError
-from grant_radar.reporting.console import render_console_report, render_markdown_report
+from grant_radar.reporting.console import (
+    render_console_report,
+    render_json_report,
+    render_markdown_report,
+)
 from grant_radar.services.evaluation import evaluate_stored
 from grant_radar.services.ingestion import KST, IngestOutcome, ingest_page
 from grant_radar.storage.sqlite import AnnouncementStore
@@ -145,13 +149,21 @@ def run_evaluate(args: argparse.Namespace) -> int:
 
     print(render_console_report(evaluations, company))
 
+    generated_at = datetime.now(KST)
     report_path = getattr(args, "report", None)
     if report_path:
         path = Path(report_path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        markdown = render_markdown_report(evaluations, company, datetime.now(KST))
-        path.write_text(markdown, encoding="utf-8")
+        path.write_text(
+            render_markdown_report(evaluations, company, generated_at), encoding="utf-8"
+        )
         print(f"\n[보고서] {path}")
+    json_path = getattr(args, "json", None)
+    if json_path:
+        path = Path(json_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(render_json_report(evaluations, company, generated_at), encoding="utf-8")
+        print(f"[JSON] {path}")
     return 0
 
 
@@ -194,6 +206,12 @@ def build_parser() -> argparse.ArgumentParser:
             default=None,
             metavar="PATH",
             help="Markdown 보고서를 지정 경로에 저장 (예: reports/report.md)",
+        )
+        target.add_argument(
+            "--json",
+            default=None,
+            metavar="PATH",
+            help="판정 결과를 JSON으로 저장 (실행 간 비교·외부 검토용)",
         )
     return parser
 

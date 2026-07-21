@@ -238,6 +238,51 @@ def test_evaluate_report_writes_markdown(tmp_path, monkeypatch, capsys):
     assert FAKE_KEY not in report
 
 
+def test_evaluate_json_output(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "pbanc_sn": 1,
+                        "biz_pbanc_nm": "전국 가상 공고",
+                        "supt_regin": "전국",
+                        "aply_trgt": "일반기업",
+                    }
+                ]
+            },
+        )
+
+    run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))
+    capsys.readouterr()
+
+    exit_code = main(["evaluate", "--json", "reports/out.json"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "[JSON]" in captured.out
+    payload = json.loads((tmp_path / "reports" / "out.json").read_text(encoding="utf-8"))
+    assert payload["company_is_fictional"] is True
+    assert payload["summary"]["total"] == 1
+    assert payload["summary"]["ELIGIBLE"] == 1
+    result = payload["results"][0]
+    assert result["source_id"] == "1"
+    assert result["decision"] == "ELIGIBLE"
+    assert {rule["rule_id"] for rule in result["rules"]} == {
+        "region.v1",
+        "business_age.v1",
+        "applicant_type.v1",
+        "age.v1",
+    }
+    assert all(rule["reason"] for rule in result["rules"])  # 근거 포함
+    assert "ServiceKey" not in json.dumps(payload)
+    assert FAKE_KEY not in json.dumps(payload)
+
+
 def test_run_command_fetches_and_evaluates(tmp_path, monkeypatch, capsys):
     from grant_radar.__main__ import run_run
 

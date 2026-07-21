@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from grant_radar.models.company import Company
@@ -150,6 +151,62 @@ def render_console_report(evaluations: list[EvaluationResult], company: Company)
         parts.append("")
         parts.extend(render_announcement_block(evaluation))
     return "\n".join(parts)
+
+
+def evaluation_to_dict(evaluation: EvaluationResult) -> dict:
+    """판정 하나를 기계가 읽을 수 있는 dict로 직렬화한다 (실행 간 diff 비교용)."""
+    ann = evaluation.announcement
+    return {
+        "source": ann.source,
+        "source_id": ann.source_id,
+        "title": ann.title,
+        "decision": evaluation.decision.value,
+        "closed": evaluation.closed,
+        "application_start": ann.application_start_at.value.isoformat()
+        if ann.application_start_at.value
+        else ann.application_start_at.raw,
+        "application_end": ann.application_end_at.value.isoformat()
+        if ann.application_end_at.value
+        else ann.application_end_at.raw,
+        "detail_url": ann.detail_url,
+        "rules": [
+            {
+                "rule_id": result.rule_id,
+                "status": result.status.value,
+                "announcement_value": result.announcement_value,
+                "company_value": result.company_value,
+                "reason": result.reason,
+                "evidence_field": result.evidence_field,
+                "confidence": result.confidence.value,
+                "human_checks": list(result.human_checks),
+            }
+            for result in evaluation.rule_results
+        ],
+        "human_checks": evaluation.human_checks,
+    }
+
+
+def render_json_report(
+    evaluations: list[EvaluationResult], company: Company, generated_at: datetime
+) -> str:
+    """정렬된 전체 판정을 JSON으로 직렬화한다."""
+    ordered = sorted(evaluations, key=sort_key)
+    counts = {decision.value: 0 for decision in Decision}
+    for evaluation in ordered:
+        counts[evaluation.decision.value] += 1
+    payload = {
+        "generated_at": generated_at.isoformat(timespec="seconds"),
+        "company_id": company.company_id,
+        "company_is_fictional": company.is_fictional,
+        "disclaimer": DISCLAIMER,
+        "summary": {
+            **counts,
+            "closed": sum(1 for e in ordered if e.closed),
+            "total": len(ordered),
+        },
+        "results": [evaluation_to_dict(evaluation) for evaluation in ordered],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
 def render_markdown_report(

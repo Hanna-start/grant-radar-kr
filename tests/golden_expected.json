@@ -1,0 +1,134 @@
+{
+  "900101": {
+    "closed": false,
+    "decision": "ELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 전 조건 통과 — 전국 사업화 지원"
+  },
+  "900102": {
+    "closed": false,
+    "decision": "INELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "FAIL"
+    },
+    "title": "[골든] 지역 불일치 — 부산 한정"
+  },
+  "900103": {
+    "closed": false,
+    "decision": "INELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "FAIL",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 예비창업자 전용"
+  },
+  "900104": {
+    "closed": false,
+    "decision": "INELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "FAIL",
+      "business_age.v1": "PASS",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 비기업 대상 — 청소년·대학생 캠프"
+  },
+  "900105": {
+    "closed": false,
+    "decision": "REVIEW_REQUIRED",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "REVIEW"
+    },
+    "title": "[골든] 매핑 불가 지역 표현"
+  },
+  "900106": {
+    "closed": false,
+    "decision": "REVIEW_REQUIRED",
+    "rules": {
+      "age.v1": "REVIEW",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 청년 전용 — 연령 제한"
+  },
+  "900107": {
+    "closed": false,
+    "decision": "REVIEW_REQUIRED",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "REVIEW",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 업력 상한 초과 추정 — 3년미만 한정"
+  },
+  "900108": {
+    "closed": false,
+    "decision": "REVIEW_REQUIRED",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "REVIEW",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 종료일 파싱 실패"
+  },
+  "900109": {
+    "closed": true,
+    "decision": "ELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 모집 종료 플래그 — 자격은 충족"
+  },
+  "900110": {
+    "closed": true,
+    "decision": "ELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "PASS"
+    },
+    "title": "[골든] 접수 종료일 경과"
+  },
+  "900111": {
+    "closed": false,
+    "decision": "INELIGIBLE",
+    "rules": {
+      "age.v1": "PASS",
+      "applicant_type.v1": "PASS",
+      "business_age.v1": "PASS",
+      "region.v1": "FAIL"
+    },
+    "title": "[골든] 결합 지역 표현 — 전남광주"
+  },
+  "900112": {
+    "closed": false,
+    "decision": "REVIEW_REQUIRED",
+    "rules": {
+      "age.v1": "NOT_APPLICABLE",
+      "applicant_type.v1": "NOT_APPLICABLE",
+      "business_age.v1": "NOT_APPLICABLE",
+      "region.v1": "REVIEW"
+    },
+    "title": "[골든] 최소 정보 — 필드 대부분 누락"
+  }
+}
