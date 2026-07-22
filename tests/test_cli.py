@@ -184,9 +184,9 @@ def test_evaluate_end_to_end(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "[판정 요약]" in captured.out
-    assert "지원 가능 1" in captured.out
+    assert "우선 검토 1" in captured.out
     assert "지원 불가 1" in captured.out
-    # 지원 가능 공고가 먼저 표시된다 (지시서 19절 정렬)
+    # 우선 검토 공고가 먼저 표시된다 (지시서 19절 정렬)
     assert captured.out.index("전국 가상 공고") < captured.out.index("부산 한정 가상 공고")
     # 제외 결과에도 이유가 표시된다
     assert "포함되지 않습니다" in captured.out

@@ -1,5 +1,5 @@
 {
-  "_comment": "골든 스냅샷용 가상 공고 표본. 실제 API 응답 구조(docs/api-observations.md)를 본떴으며 실존 공고가 아니다. 판정 경로(지원 가능/불가/검토/마감)를 모두 커버한다. 기대 판정: tests/golden_expected.json (기준 시각 2026-07-21 12:00 KST 고정).",
+  "_comment": "골든 스냅샷용 가상 공고 표본. 실제 API 응답 구조(docs/api-observations.md)를 본떴으며 실존 공고가 아니다. 판정 경로(ELIGIBLE/INELIGIBLE/REVIEW_REQUIRED/마감)를 모두 커버한다. 기대 판정: tests/golden_expected.json (기준 시각 2026-07-21 12:00 KST 고정).",
   "data": [
     {
       "pbanc_sn": 900101,

@@ -3,7 +3,7 @@
 원칙:
 - 사람이 결과만 읽고 판정 이유를 이해할 수 있어야 한다.
 - 제외 결과에도 이유를 표시한다.
-- 판정 우선순위(지원 가능 → 판단 필요 → 지원 불가), 같은 판정 안에서는
+- 판정 우선순위(우선 검토 → 판단 필요 → 지원 불가), 같은 판정 안에서는
   마감일이 가까운 공고 먼저. 마감 공고는 맨 뒤로 보낸다.
 """
 
@@ -15,8 +15,10 @@ from datetime import datetime
 from grant_radar.models.company import Company
 from grant_radar.models.decision import Decision, EvaluationResult, RuleStatus
 
+# ELIGIBLE 라벨은 "지원 가능"이 아니다: 구조화 필드 4종만 통과한 상태이며
+# 본문·첨부에만 있는 제한(validation-sample.md 4절)이 남아 있을 수 있다.
 DECISION_LABELS = {
-    Decision.ELIGIBLE: "지원 가능",
+    Decision.ELIGIBLE: "우선 검토(구조화 조건 통과)",
     Decision.REVIEW_REQUIRED: "판단 필요",
     Decision.INELIGIBLE: "지원 불가",
 }
@@ -85,7 +87,7 @@ def summary_line(evaluations: list[EvaluationResult], company: Company) -> str:
     return (
         f"[판정 요약] 회사: {company.name} ({company.company_id}, 가상회사) / "
         f"공고 {len(evaluations)}건 — "
-        f"지원 가능 {counts[Decision.ELIGIBLE]}, "
+        f"우선 검토 {counts[Decision.ELIGIBLE]}, "
         f"판단 필요 {counts[Decision.REVIEW_REQUIRED]}, "
         f"지원 불가 {counts[Decision.INELIGIBLE]}, 마감 {closed}"
     )
@@ -146,7 +148,7 @@ def render_announcement_block(evaluation: EvaluationResult) -> list[str]:
 
 def render_console_report(evaluations: list[EvaluationResult], company: Company) -> str:
     ordered = sorted(evaluations, key=sort_key)
-    parts = [summary_line(ordered, company)]
+    parts = [summary_line(ordered, company), "", DISCLAIMER]
     for evaluation in ordered:
         parts.append("")
         parts.extend(render_announcement_block(evaluation))

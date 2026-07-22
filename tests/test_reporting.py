@@ -42,7 +42,7 @@ def ineligible_evaluation(**overrides):
 class TestAnnouncementBlock:
     def test_block_follows_spec_format(self):
         text = "\n".join(render_announcement_block(eligible_evaluation()))
-        assert "[판정] 지원 가능" in text
+        assert "[판정] 우선 검토(구조화 조건 통과)" in text
         assert "[공고명]" in text
         assert "[주관기관] 가상진흥원" in text
         assert "[지원분야] 사업화" in text
@@ -97,6 +97,8 @@ class TestReportOrdering:
 
         report = render_console_report([closed, excluded, late, early], make_company())
         assert "[판정 요약]" in report
+        # 콘솔 보고서에도 면책 문구가 출력된다 (Markdown·JSON과 동일)
+        assert DISCLAIMER in report
         positions = {
             name: report.index(name)
             for name in ("빠른 마감", "늦은 마감", "제외 공고", "마감 공고")
@@ -116,4 +118,4 @@ class TestMarkdownReport:
         assert markdown.startswith("# Grant Radar KR 판정 보고서")
         assert DISCLAIMER in markdown
         assert "2026-07-21" in markdown
-        assert "[판정] 지원 가능" in markdown
+        assert "[판정] 우선 검토(구조화 조건 통과)" in markdown
