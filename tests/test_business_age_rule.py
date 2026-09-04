@@ -5,10 +5,10 @@
 
 from datetime import date
 
+from tests.factories import make_announcement, make_company
+
 from grant_radar.models.decision import Confidence, RuleStatus
 from grant_radar.rules.business_age import BusinessAgeRule, add_years
-
-from tests.factories import make_announcement, make_company
 
 RULE = BusinessAgeRule()
 

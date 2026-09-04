@@ -72,7 +72,9 @@ class RelevanceScorer:
         self._strong_groups = set(config.get("strong_groups_in_title", []))
         # 강한 제목 신호 전용 키워드 (없으면 긍정 키워드 전체를 사용)
         self._strong_title: dict[str, list[str]] = {
-            group: list(config.get("strong_title_keywords", {}).get(group, self._positive.get(group, [])))
+            group: list(
+                config.get("strong_title_keywords", {}).get(group, self._positive.get(group, []))
+            )
             for group in self._strong_groups
         }
         self._demote_title = list(config.get("demote_title_keywords", []))
@@ -167,7 +169,8 @@ class RelevanceScorer:
                 hits[group] = matched
         distinct = sum(len(v) for v in hits.values())
         strong_in_title = [
-            group for group in self._strong_groups
+            group
+            for group in self._strong_groups
             if any(w in title for w in self._strong_title.get(group, positive.get(group, [])))
         ]
         company_demoted = company.demote_keywords if company is not None else []
@@ -198,7 +201,9 @@ class RelevanceScorer:
             reasons.append(f"회사 사업장 자치구: {', '.join(matched_districts)}")
             if "지역" in self._strong_groups and "지역" not in strong_in_title:
                 strong_in_title.append("지역")
-            hits.setdefault("지역", []).extend(d for d in matched_districts if d not in hits.get("지역", []))
+            hits.setdefault("지역", []).extend(
+                d for d in matched_districts if d not in hits.get("지역", [])
+            )
 
         overriding = [g for g in strong_in_title if g in self._override_groups]
         if strong_in_title:
@@ -221,14 +226,15 @@ class RelevanceScorer:
         tier = "B"
         standalone_strong = [g for g in strong_in_title if g not in self._needs_support]
         supported_strong = [
-            g for g in strong_in_title
-            if g in self._needs_support and any(h != g for h in hits)
+            g for g in strong_in_title if g in self._needs_support and any(h != g for h in hits)
         ]
-        if standalone_strong or supported_strong:
-            tier = "A"
-        elif distinct >= self._min_distinct:
-            tier = "A"
-        elif category in self._priority_any and hits:
+        if (
+            standalone_strong
+            or supported_strong
+            or distinct >= self._min_distinct
+            or category in self._priority_any
+            and hits
+        ):
             tier = "A"
         if tier == "A" and industry_flagged:
             tier = "B"

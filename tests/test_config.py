@@ -37,7 +37,7 @@ def test_parse_env_file_missing_returns_empty(tmp_path):
 
 def test_parse_env_file_with_bom(tmp_path):
     env = tmp_path / ".env"
-    env.write_bytes(b"\xef\xbb\xbf" + f"KSTARTUP_API_KEY={FAKE_KEY}\n".encode("utf-8"))
+    env.write_bytes(b"\xef\xbb\xbf" + f"KSTARTUP_API_KEY={FAKE_KEY}\n".encode())
     assert parse_env_file(env)["KSTARTUP_API_KEY"] == FAKE_KEY
 
 

@@ -8,7 +8,7 @@
 4. 확인되지 않은 API 기능을 추측하지 않는다.
 5. 공개 데이터와 내부 데이터(인증키, 실제 회사 정보)를 분리한다.
 
-## 현재 구성 (5단계까지)
+## 현재 구성
 
 ```
 grant_radar/
@@ -103,9 +103,9 @@ K-Startup API ─→ api.kstartup.KStartupClient ─→ FetchResult
 - 원본 항목은 `raw_data`에 그대로 보존 (알 수 없는 필드 포함)
 - 정규화 중 특이사항은 `issues`에 축적 → 이후 판정 단계의 REVIEW_REQUIRED 근거
 
-## 이후 단계에서 추가될 구성
+## 구현 범위 밖
 
-- `models/company.py`, `models/decision.py` — 가상회사, 판정 결과 모델
-- `rules/` — 지역, 업력, 신청자 유형 등 결정론적 1차 규칙
-- `services/evaluation.py` — 판정 오케스트레이션
-- `reporting/` — 판정 근거를 포함한 사람이 읽을 수 있는 보고서
+- 웹 UI와 사용자 계정
+- 지원사업 자동 신청
+- 공고 첨부파일 전문 수집·해석
+- 법적·공식 자격 확정

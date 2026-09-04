@@ -2,7 +2,7 @@
 
 import argparse
 import json
-from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -51,7 +51,7 @@ SAMPLE_REPORT = """# Grant Radar KR 판정 보고서
 class FakeSMTP:
     """smtplib.SMTP 대역. 호출 순서를 기록만 한다."""
 
-    instances: list["FakeSMTP"] = []
+    instances: ClassVar[list["FakeSMTP"]] = []
 
     def __init__(self, host, port):
         self.host, self.port = host, port

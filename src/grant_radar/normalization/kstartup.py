@@ -86,7 +86,8 @@ def _date_field(value: Any) -> DateField:
         return DateField()
     for pattern in DATE_PATTERNS:
         try:
-            parsed = datetime.strptime(raw, pattern).date()
+            # 입력은 시각이 없는 공고 날짜이므로 timezone 변환 대상이 아니다.
+            parsed = datetime.strptime(raw, pattern).date()  # noqa: DTZ007
         except ValueError:
             continue
         return DateField(raw=raw, value=parsed)

@@ -2,7 +2,7 @@
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -59,7 +59,7 @@ def make_result(data, page=1, per_page=5):
         status_code=200,
         data=data,
         raw_text=json.dumps(data, ensure_ascii=False),
-        fetched_at=datetime(2026, 7, 21, 12, 0, 0, tzinfo=timezone.utc),
+        fetched_at=datetime(2026, 7, 21, 12, 0, 0, tzinfo=UTC),
     )
 
 
@@ -716,10 +716,22 @@ def test_run_new_only_reports_only_this_run(tmp_path, monkeypatch, capsys):
             200,
             json={
                 "data": [
-                    {"pbanc_sn": 11, "biz_pbanc_nm": "모집 중 가상 공고", "supt_regin": "전국",
-                     "aply_trgt": "일반기업", "pbanc_rcpt_end_dt": "20990731", "rcrt_prgs_yn": "Y"},
-                    {"pbanc_sn": 13, "biz_pbanc_nm": "새로 올라온 가상 공고", "supt_regin": "전국",
-                     "aply_trgt": "일반기업", "pbanc_rcpt_end_dt": "20990731", "rcrt_prgs_yn": "Y"},
+                    {
+                        "pbanc_sn": 11,
+                        "biz_pbanc_nm": "모집 중 가상 공고",
+                        "supt_regin": "전국",
+                        "aply_trgt": "일반기업",
+                        "pbanc_rcpt_end_dt": "20990731",
+                        "rcrt_prgs_yn": "Y",
+                    },
+                    {
+                        "pbanc_sn": 13,
+                        "biz_pbanc_nm": "새로 올라온 가상 공고",
+                        "supt_regin": "전국",
+                        "aply_trgt": "일반기업",
+                        "pbanc_rcpt_end_dt": "20990731",
+                        "rcrt_prgs_yn": "Y",
+                    },
                 ]
             },
         )
@@ -747,9 +759,18 @@ def test_evaluate_since_accepts_iso_datetime(tmp_path, monkeypatch, capsys):
     def handler(request):
         return httpx.Response(
             200,
-            json={"data": [{"pbanc_sn": 21, "biz_pbanc_nm": "가상 공고", "supt_regin": "전국",
-                            "aply_trgt": "일반기업", "pbanc_rcpt_end_dt": "20990731",
-                            "rcrt_prgs_yn": "Y"}]},
+            json={
+                "data": [
+                    {
+                        "pbanc_sn": 21,
+                        "biz_pbanc_nm": "가상 공고",
+                        "supt_regin": "전국",
+                        "aply_trgt": "일반기업",
+                        "pbanc_rcpt_end_dt": "20990731",
+                        "rcrt_prgs_yn": "Y",
+                    }
+                ]
+            },
         )
 
     run_fetch(fetch_args(no_save=True), client_factory=make_factory(handler))

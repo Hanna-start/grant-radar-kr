@@ -1,11 +1,27 @@
 # Grant Radar KR
 
-K-Startup 공개 데이터를 수집하고, 가상회사의 객관적 조건과 비교하여 검토
-우선순위를 제공하는 **실험적 의사결정 보조 프로젝트**입니다.
+[![CI](https://github.com/Hanna-start/grant-radar-kr/actions/workflows/ci.yml/badge.svg)](https://github.com/Hanna-start/grant-radar-kr/actions/workflows/ci.yml)
+
+K-Startup과 기업마당의 공개 지원사업 공고를 수집·정규화해 SQLite에 저장하고,
+선택적으로 회사 조건과 비교하여 검토 우선순위를 만드는 **실험적 CLI 프로젝트**입니다.
+
+핵심 결과물은 재사용 가능한 공고 데이터베이스입니다. 회사별 판정, 보고서와 주간
+이메일은 수집 결과를 활용하는 선택 기능이며 사용하지 않아도 됩니다.
 
 이 시스템은 공식 자격 판정 도구가 아니며, 최종 의사결정이나 자동 신청을
 수행하지 않습니다. 모든 판정 결과는 사람이 원문 공고를 확인하는 것을
 전제로 합니다.
+
+## 프로젝트 범위
+
+```text
+공공 API → 정규화 → SQLite 저장 → 신규·변경·마감 감지
+                              └→ (선택) 회사별 규칙 판정 → Markdown/JSON → 이메일
+```
+
+- 포함: 공개 API 수집, 원본 보존, 공통 모델 변환, 변경 감지, 로컬 DB 저장
+- 선택: 회사 프로필 판정, 관련도 A/B/C, 보고서, Windows 주간 실행과 SMTP 메일
+- 제외: 웹 UI, 지원 자격 확정, 자동 신청, 공고 첨부파일 전문 분석
 
 ## 해결하려는 문제
 
@@ -16,7 +32,7 @@ K-Startup 공개 데이터를 수집하고, 가상회사의 객관적 조건과 
 
 ## 현재 개발 단계
 
-**7단계: 표본 검증 완료** — 초기 MVP 완료 기준 충족
+**MVP 완료** — 수집·정규화·저장·판정 파이프라인과 재현성 테스트 구현
 
 - [x] 프로젝트 구조 및 설정
 - [x] K-Startup API 클라이언트 최소 구현 (한 페이지 조회)
@@ -86,6 +102,9 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 .venv\Scripts\python.exe -m grant_radar fetch --per-page 100 --pages 5
 ```
 
+수집만 원하는 경우 여기까지 실행하면 됩니다. 결과는
+`data/announcements.db`에 누적되며 회사 프로필이나 메일 설정은 필요하지 않습니다.
+
 수집 원천은 `--source`로 선택합니다. 기본은 K-Startup(창업지원)이고,
 `bizinfo`는 기업마당(중소기업 지원사업 — 인력·금융 분야 포함)입니다.
 두 원천 모두 같은 인증키를 쓰지만, 공공데이터포털에서 데이터셋별
@@ -123,7 +142,7 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 .venv\Scripts\python.exe -m grant_radar run --source bizinfo --per-page 100 --pages 17 --open-only --since 2026-08-22 --report reports\report.md
 ```
 
-## 정기 실행 (매주 월요일 09:00, 메일 보고)
+## 선택 기능: 정기 실행과 메일 보고
 
 실행 경로에 언어모델·외부 서비스가 없습니다. Windows 작업 스케줄러가
 `scripts/weekly_run.ps1`을 호출하고, 스크립트는 K-Startup·기업마당 수집 →
@@ -261,10 +280,11 @@ C는 제외가 아니라 배치이며 판정 결과는 바뀌지 않습니다.
 
 자세한 내용은 [docs/limitations.md](docs/limitations.md)를 참고하세요.
 
-## 향후 계획
+## 프로젝트 상태와 향후 범위
 
-첨부파일 수집·텍스트 추출, 상세 검토 항목 추출, 알림(이메일/Slack) 등은
-1차 판정이 검증된 후 단계적으로 검토합니다.
+현재 버전은 공개 API 공고를 로컬에 수집하고 구조화하는 MVP입니다. 첨부파일
+수집·텍스트 추출, 상세 자격 검토와 웹 UI는 구현 범위에 포함되지 않습니다.
+정확도 한계와 검증 범위는 [docs/limitations.md](docs/limitations.md)에 공개합니다.
 
 ## 라이선스
 

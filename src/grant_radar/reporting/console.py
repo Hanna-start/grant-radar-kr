@@ -127,9 +127,7 @@ def tier_counts(scored) -> dict[str, int]:
 
 def relevance_summary(scored) -> str:
     counts = tier_counts(scored)
-    return "[관련도] " + ", ".join(
-        f"{TIER_LABELS[tier]} {counts[tier]}" for tier in TIER_ORDER
-    )
+    return "[관련도] " + ", ".join(f"{TIER_LABELS[tier]} {counts[tier]}" for tier in TIER_ORDER)
 
 
 def one_line(evaluation: EvaluationResult, relevance: Relevance) -> str:
@@ -234,6 +232,7 @@ def _render_sections(scored, heading) -> list[str]:
 
     heading(title) -> list[str]: 섹션 제목 줄을 만드는 함수 (콘솔/Markdown 차이).
     """
+
     def reviewable(pair) -> bool:
         return pair[0].decision != Decision.INELIGIBLE
 
@@ -259,21 +258,23 @@ def _render_sections(scored, heading) -> list[str]:
             parts.extend(render_announcement_block(evaluation))
             parts.append(f"[관련도] {relevance.label}: {'; '.join(relevance.reasons)}")
     if open_c:
-        parts.extend([
-            "",
-            *heading(f"관련 낮음 (C) — {len(open_c)}건, 제목만 (놓침 방지용 부록)"),
-            "",
-        ])
+        parts.extend(
+            [
+                "",
+                *heading(f"관련 낮음 (C) — {len(open_c)}건, 제목만 (놓침 방지용 부록)"),
+                "",
+            ]
+        )
         parts.extend(one_line(evaluation, relevance) for evaluation, relevance in open_c)
     if open_ineligible:
-        parts.extend([
-            "",
-            *heading(f"지원 불가 — {len(open_ineligible)}건, 제목·제외 사유만"),
-            "",
-        ])
         parts.extend(
-            one_line(evaluation, relevance) for evaluation, relevance in open_ineligible
+            [
+                "",
+                *heading(f"지원 불가 — {len(open_ineligible)}건, 제목·제외 사유만"),
+                "",
+            ]
         )
+        parts.extend(one_line(evaluation, relevance) for evaluation, relevance in open_ineligible)
     if closed:
         parts.extend(["", *heading(f"마감 — {len(closed)}건")])
         for evaluation, _relevance in closed:
@@ -398,7 +399,8 @@ def render_markdown_report(
 def _render_a_summary(scored) -> list[str]:
     """맨 위 요약표: 관련 높음(A)·모집 중·검토 대상만 분야별 한 줄씩."""
     rows = [
-        (e, r) for e, r in scored
+        (e, r)
+        for e, r in scored
         if r.tier == "A" and not e.closed and e.decision != Decision.INELIGIBLE
     ]
     if not rows:

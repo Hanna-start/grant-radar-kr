@@ -17,8 +17,8 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Self
 from urllib.parse import quote, quote_plus
 
 import httpx
@@ -196,7 +196,7 @@ class KStartupClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "KStartupClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -297,5 +297,5 @@ class KStartupClient:
             status_code=response.status_code,
             data=data,
             raw_text=safe_text,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
         )

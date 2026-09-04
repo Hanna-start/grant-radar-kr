@@ -17,9 +17,10 @@ from __future__ import annotations
 import html
 import json
 import re
+from collections.abc import Iterator
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from grant_radar.models.announcement import (
     ApplicationMethod,
@@ -41,9 +42,7 @@ class BizinfoNormalizationError(Exception):
 
 def load_region_tokens(path: Path | None = None) -> frozenset[str]:
     """지역 매핑표의 모든 표현(정식 시도명·별칭·그룹)을 집합으로 만든다."""
-    mapping = json.loads(
-        Path(path or DEFAULT_REGION_MAPPING_PATH).read_text(encoding="utf-8")
-    )
+    mapping = json.loads(Path(path or DEFAULT_REGION_MAPPING_PATH).read_text(encoding="utf-8"))
     return frozenset(
         [*mapping.get("canonical", []), *mapping.get("aliases", {}), *mapping.get("groups", {})]
     )
@@ -180,9 +179,7 @@ def iter_items(body: Any) -> Iterator[dict]:
     if isinstance(items, dict):
         items = [items]
     if not isinstance(items, list):
-        raise BizinfoNormalizationError(
-            f"items 형태를 해석할 수 없습니다: {type(items).__name__}"
-        )
+        raise BizinfoNormalizationError(f"items 형태를 해석할 수 없습니다: {type(items).__name__}")
     for entry in items:
         if isinstance(entry, dict):
             yield entry
@@ -195,6 +192,4 @@ def normalize_bizinfo_page(
 ) -> list[NormalizedAnnouncement]:
     if region_tokens is None:
         region_tokens = load_region_tokens()
-    return [
-        normalize_bizinfo_item(item, fetched_at, region_tokens) for item in iter_items(body)
-    ]
+    return [normalize_bizinfo_item(item, fetched_at, region_tokens) for item in iter_items(body)]

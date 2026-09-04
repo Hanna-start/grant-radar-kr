@@ -1,7 +1,10 @@
 """전체 판정 테스트 (지시서 20.5절)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+from tests.factories import make_announcement, make_company
+from tests.test_normalization import full_item
 
 from grant_radar.models.decision import Confidence, Decision, RuleResult, RuleStatus
 from grant_radar.rules.age import AgeRule
@@ -12,9 +15,6 @@ from grant_radar.services.evaluation import decide, evaluate_announcement, evalu
 from grant_radar.services.ingestion import ingest_page
 from grant_radar.storage.sqlite import AnnouncementStore
 
-from tests.factories import make_announcement, make_company
-from tests.test_normalization import full_item
-
 MAPPING_PATH = Path(__file__).parent.parent / "data" / "reference" / "region_mapping.json"
 RULES = [
     RegionRule(load_region_mapping(MAPPING_PATH)),
@@ -22,7 +22,7 @@ RULES = [
     ApplicantTypeRule(),
     AgeRule(),
 ]
-AS_OF = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 21, 10, 0, 0, tzinfo=UTC)
 
 
 def rule_result(rule_id, status, confidence=Confidence.HIGH):

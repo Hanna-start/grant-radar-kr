@@ -14,7 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Self
 
 import httpx
 
@@ -65,7 +66,7 @@ class BizinfoClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "BizinfoClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -155,8 +156,7 @@ class BizinfoClient:
         result_code = str(header.get("resultCode", "")).strip()
         if result_code and result_code not in ("0", "00"):
             raise UnexpectedResponseError(
-                f"기업마당 응답 오류 코드 {result_code}: "
-                f"{str(header.get('resultMsg', '')).strip()}"
+                f"기업마당 응답 오류 코드 {result_code}: {str(header.get('resultMsg', '')).strip()}"
             )
 
         return FetchResult(
@@ -165,5 +165,5 @@ class BizinfoClient:
             status_code=response.status_code,
             data=data,
             raw_text=safe_text,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
         )

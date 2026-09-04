@@ -24,17 +24,17 @@ from grant_radar.api.bizinfo import BizinfoClient
 from grant_radar.api.kstartup import FetchResult, KStartupApiError, KStartupClient
 from grant_radar.config import ConfigError, load_mail_settings, load_settings
 from grant_radar.models.company import CompanyDataError, load_company
+from grant_radar.normalization.bizinfo import (
+    BizinfoNormalizationError,
+    normalize_bizinfo_page,
+)
+from grant_radar.normalization.kstartup import NormalizationError, normalize_page
 from grant_radar.notify.mail import (
     ReportRef,
     build_failure_message,
     build_report_message,
     send_message,
 )
-from grant_radar.normalization.bizinfo import (
-    BizinfoNormalizationError,
-    normalize_bizinfo_page,
-)
-from grant_radar.normalization.kstartup import NormalizationError, normalize_page
 from grant_radar.reporting.console import (
     render_console_report,
     render_json_report,
@@ -383,9 +383,7 @@ def build_parser() -> argparse.ArgumentParser:
             help="수집 원천 (기본 kstartup). bizinfo=기업마당 중소기업 지원사업",
         )
         target.add_argument("--page", type=int, default=1, help="시작 페이지 번호 (기본 1)")
-        target.add_argument(
-            "--per-page", type=int, default=5, help="페이지당 결과 수 (기본 5)"
-        )
+        target.add_argument("--per-page", type=int, default=5, help="페이지당 결과 수 (기본 5)")
         target.add_argument(
             "--pages",
             type=int,

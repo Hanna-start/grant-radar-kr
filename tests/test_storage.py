@@ -1,15 +1,15 @@
 """SQLite 저장소와 수집(변경/마감 감지) 테스트. 실제 API를 호출하지 않는다."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+from tests.test_normalization import full_item
 
 from grant_radar.normalization.kstartup import normalize_announcement
 from grant_radar.services.ingestion import KST, ingest_page, is_closed
 from grant_radar.storage.sqlite import AnnouncementStore, content_hash
 
-from tests.test_normalization import full_item
-
-SEEN_AT = datetime(2026, 7, 21, 12, 0, 0, tzinfo=timezone.utc)
-LATER = datetime(2026, 7, 22, 12, 0, 0, tzinfo=timezone.utc)
+SEEN_AT = datetime(2026, 7, 21, 12, 0, 0, tzinfo=UTC)
+LATER = datetime(2026, 7, 22, 12, 0, 0, tzinfo=UTC)
 
 
 def make_store():
@@ -110,7 +110,7 @@ class TestClosedPolicy:
 
     def test_utc_time_is_converted_to_kst(self):
         # UTC 7/31 16:00 = KST 8/1 01:00 → 마감
-        as_of = datetime(2026, 7, 31, 16, 0, 0, tzinfo=timezone.utc)
+        as_of = datetime(2026, 7, 31, 16, 0, 0, tzinfo=UTC)
         assert is_closed(ann(), as_of) is True
 
     def test_unparseable_end_date_is_not_closed(self):

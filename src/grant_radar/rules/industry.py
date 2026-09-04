@@ -57,9 +57,7 @@ class IndustryRule:
     rule_id = "industry.v1"
 
     def __init__(self, keywords: dict) -> None:
-        self._sectors: dict[str, list[str]] = dict(
-            keywords.get("restricted_sector_keywords", {})
-        )
+        self._sectors: dict[str, list[str]] = dict(keywords.get("restricted_sector_keywords", {}))
         self._latin_sectors: dict[str, list[tuple[str, re.Pattern[str]]]] = {
             sector: [(keyword, _latin_pattern(keyword)) for keyword in words]
             for sector, words in keywords.get("restricted_sector_keywords_latin", {}).items()

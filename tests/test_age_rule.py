@@ -7,10 +7,10 @@
 
 from datetime import date
 
+from tests.factories import make_announcement, make_company
+
 from grant_radar.models.decision import RuleStatus
 from grant_radar.rules.age import AgeRule, age_on, parse_age_band
-
-from tests.factories import make_announcement, make_company
 
 RULE = AgeRule()
 

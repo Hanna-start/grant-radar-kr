@@ -14,6 +14,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+from tests.factories import make_company
+
 from grant_radar.normalization.bizinfo import load_region_tokens, normalize_bizinfo_page
 from grant_radar.normalization.kstartup import normalize_page
 from grant_radar.rules.age import AgeRule
@@ -23,8 +25,6 @@ from grant_radar.rules.industry import IndustryRule, load_industry_keywords
 from grant_radar.rules.region import RegionRule, load_region_mapping
 from grant_radar.services.evaluation import evaluate_announcement
 from grant_radar.services.ingestion import KST
-
-from tests.factories import make_company
 
 ROOT = Path(__file__).parent.parent
 FIXTURE_PATH = ROOT / "data" / "fixtures" / "golden_announcements.json"

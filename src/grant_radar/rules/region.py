@@ -83,9 +83,7 @@ class RegionRule:
                 company_value=hq,
                 reason=reason,
                 evidence_field=(
-                    "hashtags(시도 추출)"
-                    if announcement.source == "bizinfo"
-                    else "supt_regin"
+                    "hashtags(시도 추출)" if announcement.source == "bizinfo" else "supt_regin"
                 ),
                 confidence=confidence,
                 human_checks=list(human_checks),

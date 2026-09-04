@@ -120,9 +120,8 @@ class TestGatewayErrors:
         def handler(request):
             return gateway_error_response(code)
 
-        with make_client(handler) as client:
-            with pytest.raises(expected) as exc_info:
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(expected) as exc_info:
+            client.fetch_announcements_page()
         # 하위 클래스 매칭으로 오분류가 숨지 않도록 정확한 타입을 단언한다
         assert type(exc_info.value) is expected
         assert str(code) in str(exc_info.value)
@@ -134,9 +133,8 @@ class TestGatewayErrors:
             calls.append(request)
             return gateway_error_response(12)
 
-        with make_client(handler, max_retries=3) as client:
-            with pytest.raises(ServiceGoneError):
-                client.fetch_announcements_page()
+        with make_client(handler, max_retries=3) as client, pytest.raises(ServiceGoneError):
+            client.fetch_announcements_page()
         assert len(calls) == 1
 
     def test_gateway_error_recognized_even_with_5xx_status(self):
@@ -144,17 +142,15 @@ class TestGatewayErrors:
         def handler(request):
             return gateway_error_response(30, status=500)
 
-        with make_client(handler, max_retries=0) as client:
-            with pytest.raises(AuthenticationError):
-                client.fetch_announcements_page()
+        with make_client(handler, max_retries=0) as client, pytest.raises(AuthenticationError):
+            client.fetch_announcements_page()
 
     def test_auth_error_message_guides_user(self):
         def handler(request):
             return gateway_error_response(30, "SERVICE_KEY_IS_NOT_REGISTERED_ERROR")
 
-        with make_client(handler) as client:
-            with pytest.raises(AuthenticationError) as exc_info:
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(AuthenticationError) as exc_info:
+            client.fetch_announcements_page()
         message = str(exc_info.value)
         assert "KSTARTUP_API_KEY" in message
         assert FAKE_KEY not in message
@@ -163,9 +159,8 @@ class TestGatewayErrors:
         def handler(request):
             return httpx.Response(200, text="<unknown><shape/></unknown>")
 
-        with make_client(handler) as client:
-            with pytest.raises(ResponseParseError):
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(ResponseParseError):
+            client.fetch_announcements_page()
 
     def test_success_xml_means_return_type_ignored(self):
         def handler(request):
@@ -175,9 +170,8 @@ class TestGatewayErrors:
                 "<resultMsg>NORMAL SERVICE.</resultMsg></header></response>",
             )
 
-        with make_client(handler) as client:
-            with pytest.raises(UnexpectedResponseError):
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(UnexpectedResponseError):
+            client.fetch_announcements_page()
 
 
 class TestTransportFailures:
@@ -185,9 +179,8 @@ class TestTransportFailures:
         def handler(request):
             return httpx.Response(200, text="this is not json {")
 
-        with make_client(handler) as client:
-            with pytest.raises(ResponseParseError):
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(ResponseParseError):
+            client.fetch_announcements_page()
 
     def test_timeout_raises_after_retries(self):
         calls = []
@@ -196,9 +189,8 @@ class TestTransportFailures:
             calls.append(request)
             raise httpx.ReadTimeout("timed out")
 
-        with make_client(handler, max_retries=1) as client:
-            with pytest.raises(RequestTimeoutError):
-                client.fetch_announcements_page()
+        with make_client(handler, max_retries=1) as client, pytest.raises(RequestTimeoutError):
+            client.fetch_announcements_page()
         assert len(calls) == 2  # 최초 1회 + 재시도 1회
 
     def test_network_error_then_success_retries(self):
@@ -233,9 +225,8 @@ class TestTransportFailures:
         def handler(request):
             return httpx.Response(503, text="Service Unavailable")
 
-        with make_client(handler, max_retries=1) as client:
-            with pytest.raises(ServiceUnavailableError):
-                client.fetch_announcements_page()
+        with make_client(handler, max_retries=1) as client, pytest.raises(ServiceUnavailableError):
+            client.fetch_announcements_page()
 
     def test_html_error_page_5xx_is_still_retryable(self):
         # 프록시/게이트웨이 장애 시 흔한 HTML 오류 페이지가
@@ -259,9 +250,8 @@ class TestTransportFailures:
         def handler(request):
             return httpx.Response(404, text="<html><body>Not Found</body></html>")
 
-        with make_client(handler) as client:
-            with pytest.raises(UnexpectedResponseError) as exc_info:
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(UnexpectedResponseError) as exc_info:
+            client.fetch_announcements_page()
         assert "404" in str(exc_info.value)
 
     def test_auth_error_is_not_retried(self):
@@ -271,18 +261,16 @@ class TestTransportFailures:
             calls.append(request)
             return gateway_error_response(30)
 
-        with make_client(handler, max_retries=3) as client:
-            with pytest.raises(AuthenticationError):
-                client.fetch_announcements_page()
+        with make_client(handler, max_retries=3) as client, pytest.raises(AuthenticationError):
+            client.fetch_announcements_page()
         assert len(calls) == 1
 
     def test_unexpected_status_code(self):
         def handler(request):
             return httpx.Response(404, text="Not Found")
 
-        with make_client(handler) as client:
-            with pytest.raises(UnexpectedResponseError):
-                client.fetch_announcements_page()
+        with make_client(handler) as client, pytest.raises(UnexpectedResponseError):
+            client.fetch_announcements_page()
 
 
 class TestKeyMasking:
@@ -315,9 +303,11 @@ class TestKeyMasking:
         ],
     )
     def test_exceptions_never_contain_key(self, handler_factory):
-        with make_client(handler_factory(), max_retries=0) as client:
-            with pytest.raises(Exception) as exc_info:
-                client.fetch_announcements_page()
+        with (
+            make_client(handler_factory(), max_retries=0) as client,
+            pytest.raises(Exception) as exc_info,
+        ):
+            client.fetch_announcements_page()
         message = str(exc_info.value) + repr(exc_info.value)
         assert FAKE_KEY not in message
         assert quote(FAKE_KEY, safe="") not in message

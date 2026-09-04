@@ -1,7 +1,9 @@
 """보고서 렌더러 테스트 (지시서 19절 형식)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+from tests.factories import make_announcement, make_company
 
 from grant_radar.reporting.console import (
     DISCLAIMER,
@@ -15,8 +17,6 @@ from grant_radar.rules.business_age import BusinessAgeRule
 from grant_radar.rules.region import RegionRule, load_region_mapping
 from grant_radar.services.evaluation import evaluate_announcement
 
-from tests.factories import make_announcement, make_company
-
 MAPPING_PATH = Path(__file__).parent.parent / "data" / "reference" / "region_mapping.json"
 RULES = [
     RegionRule(load_region_mapping(MAPPING_PATH)),
@@ -24,21 +24,27 @@ RULES = [
     ApplicantTypeRule(),
     AgeRule(),
 ]
-AS_OF = datetime(2026, 7, 21, 10, 0, 0, tzinfo=timezone.utc)
+AS_OF = datetime(2026, 7, 21, 10, 0, 0, tzinfo=UTC)
 
 
 def eligible_evaluation(**overrides):
-    defaults = dict(
-        supt_regin="전국", biz_enyy="10년미만", aply_trgt="일반기업", supt_biz_clsfc="정책자금"
-    )
+    defaults = {
+        "supt_regin": "전국",
+        "biz_enyy": "10년미만",
+        "aply_trgt": "일반기업",
+        "supt_biz_clsfc": "정책자금",
+    }
     defaults.update(overrides)
     return evaluate_announcement(make_announcement(**defaults), make_company(), RULES, AS_OF)
 
 
 def ineligible_evaluation(**overrides):
-    defaults = dict(
-        supt_regin="부산", biz_enyy="10년미만", aply_trgt="일반기업", supt_biz_clsfc="정책자금"
-    )
+    defaults = {
+        "supt_regin": "부산",
+        "biz_enyy": "10년미만",
+        "aply_trgt": "일반기업",
+        "supt_biz_clsfc": "정책자금",
+    }
     defaults.update(overrides)
     return evaluate_announcement(make_announcement(**defaults), make_company(), RULES, AS_OF)
 
@@ -117,7 +123,7 @@ class TestReportOrdering:
 
 class TestMarkdownReport:
     def test_markdown_report_has_header_and_disclaimer(self):
-        generated_at = datetime(2026, 7, 21, 17, 0, tzinfo=timezone.utc)
+        generated_at = datetime(2026, 7, 21, 17, 0, tzinfo=UTC)
         markdown = render_markdown_report([eligible_evaluation()], make_company(), generated_at)
         assert markdown.startswith("# Grant Radar KR 판정 보고서")
         assert DISCLAIMER in markdown
@@ -127,6 +133,7 @@ class TestMarkdownReport:
 
 def test_other_district_announcement_is_hidden_with_count():
     from tests.test_normalization_bizinfo import REGION_TOKENS, full_bizinfo_item
+
     from grant_radar.normalization.bizinfo import normalize_bizinfo_item
 
     company = make_company(
@@ -141,7 +148,9 @@ def test_other_district_announcement_is_hidden_with_count():
         region_tokens=REGION_TOKENS,
     )
     evaluation = evaluate_announcement(other, company, RULES, AS_OF)
-    generated_at = datetime(2026, 7, 21, 17, 0, tzinfo=timezone.utc)
+    generated_at = datetime(2026, 7, 21, 17, 0, tzinfo=UTC)
     markdown = render_markdown_report([evaluation], company, generated_at)
-    assert "성동구" not in markdown.split("표시하지 않음")[1] if "표시하지 않음" in markdown else False
+    assert (
+        "성동구" not in markdown.split("표시하지 않음")[1] if "표시하지 않음" in markdown else False
+    )
     assert "타 자치구·시군 한정 공고 1건은 표시하지 않음" in markdown

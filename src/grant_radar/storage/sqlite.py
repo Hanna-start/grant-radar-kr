@@ -19,6 +19,7 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Self
 
 from grant_radar.models.announcement import NormalizedAnnouncement
 
@@ -79,7 +80,7 @@ class AnnouncementStore:
     def close(self) -> None:
         self._conn.close()
 
-    def __enter__(self) -> "AnnouncementStore":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *exc_info: object) -> None:

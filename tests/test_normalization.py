@@ -4,7 +4,7 @@
 (docs/api-observations.md, 2026-07-21)을 그대로 본떴다.
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -14,7 +14,7 @@ from grant_radar.normalization.kstartup import (
     normalize_page,
 )
 
-FETCHED_AT = datetime(2026, 7, 21, 12, 0, 0, tzinfo=timezone.utc)
+FETCHED_AT = datetime(2026, 7, 21, 12, 0, 0, tzinfo=UTC)
 
 
 def full_item(**overrides):

@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
+from tests.factories import make_announcement, make_company
+
 from grant_radar.models.decision import Confidence, RuleStatus
 from grant_radar.rules.region import RegionRule, load_region_mapping
-
-from tests.factories import make_announcement, make_company
 
 MAPPING_PATH = Path(__file__).parent.parent / "data" / "reference" / "region_mapping.json"
 RULE = RegionRule(load_region_mapping(MAPPING_PATH))

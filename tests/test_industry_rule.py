@@ -6,6 +6,7 @@
 from pathlib import Path
 
 import pytest
+from tests.factories import make_announcement, make_company
 
 from grant_radar.models.decision import RuleStatus
 from grant_radar.rules.industry import (
@@ -13,8 +14,6 @@ from grant_radar.rules.industry import (
     IndustryRule,
     load_industry_keywords,
 )
-
-from tests.factories import make_announcement, make_company
 
 KEYWORDS_PATH = Path(__file__).parent.parent / "data" / "reference" / "industry_keywords.json"
 

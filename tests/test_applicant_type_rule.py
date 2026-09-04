@@ -1,9 +1,9 @@
 """신청자 유형 규칙 테스트 (지시서 14.3절)."""
 
+from tests.factories import make_announcement, make_company
+
 from grant_radar.models.decision import Confidence, RuleStatus
 from grant_radar.rules.applicant_type import ApplicantTypeRule
-
-from tests.factories import make_announcement, make_company
 
 RULE = ApplicantTypeRule()
 

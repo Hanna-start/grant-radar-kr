@@ -14,9 +14,7 @@ FAKE_KEY = "fake-bizinfo-test-key"
 
 
 def make_client(handler, **kwargs):
-    return BizinfoClient(
-        FAKE_KEY, transport=httpx.MockTransport(handler), retry_wait=0.0, **kwargs
-    )
+    return BizinfoClient(FAKE_KEY, transport=httpx.MockTransport(handler), retry_wait=0.0, **kwargs)
 
 
 def success_body():
@@ -62,9 +60,8 @@ def test_gateway_xml_error_maps_to_exception():
             ),
         )
 
-    with make_client(handler) as client:
-        with pytest.raises(AuthenticationError):
-            client.fetch_announcements_page()
+    with make_client(handler) as client, pytest.raises(AuthenticationError):
+        client.fetch_announcements_page()
 
 
 def test_non_success_result_code_raises():
@@ -74,9 +71,8 @@ def test_non_success_result_code_raises():
     def handler(request):
         return httpx.Response(200, json=body)
 
-    with make_client(handler) as client:
-        with pytest.raises(UnexpectedResponseError) as exc_info:
-            client.fetch_announcements_page()
+    with make_client(handler) as client, pytest.raises(UnexpectedResponseError) as exc_info:
+        client.fetch_announcements_page()
     assert "03" in str(exc_info.value)
 
 
@@ -84,9 +80,8 @@ def test_error_messages_never_contain_key():
     def handler(request):
         return httpx.Response(200, text=f"invalid json echo {FAKE_KEY}")
 
-    with make_client(handler) as client:
-        with pytest.raises(ResponseParseError) as exc_info:
-            client.fetch_announcements_page()
+    with make_client(handler) as client, pytest.raises(ResponseParseError) as exc_info:
+        client.fetch_announcements_page()
     assert FAKE_KEY not in str(exc_info.value)
     assert "***" in str(exc_info.value)
 

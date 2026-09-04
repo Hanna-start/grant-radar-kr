@@ -3,11 +3,11 @@
 from pathlib import Path
 
 import pytest
+from tests.factories import make_announcement, make_company
+from tests.test_normalization_bizinfo import REGION_TOKENS, full_bizinfo_item
 
 from grant_radar.normalization.bizinfo import normalize_bizinfo_item
 from grant_radar.relevance import RelevanceConfigError, RelevanceScorer, load_relevance_config
-from tests.factories import make_announcement, make_company
-from tests.test_normalization_bizinfo import REGION_TOKENS, full_bizinfo_item
 
 CONFIG_PATH = Path(__file__).parent.parent / "data" / "reference" / "relevance.json"
 SCORER = RelevanceScorer(load_relevance_config(CONFIG_PATH))

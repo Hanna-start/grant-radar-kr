@@ -53,9 +53,7 @@ class ApplicantTypeRule:
                 announcement_value=", ".join(allowed) if allowed else None,
                 company_value=company.business_type,
                 reason=reason,
-                evidence_field=(
-                    "trgetNm" if announcement.source == "bizinfo" else "aply_trgt"
-                ),
+                evidence_field=("trgetNm" if announcement.source == "bizinfo" else "aply_trgt"),
                 confidence=confidence,
                 human_checks=list(human_checks),
             )

@@ -14,8 +14,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Sequence
 
 from grant_radar.models.announcement import NormalizedAnnouncement
 from grant_radar.models.company import Company
@@ -88,7 +88,8 @@ def evaluate_announcement(
     for rule in rules:
         try:
             results.append(rule.evaluate(announcement, company))
-        except Exception as exc:  # 규칙 하나의 오류로 전체 판정이 중단되지 않는다
+        # 한 규칙의 예외가 다른 공고의 판정까지 중단시키지 않도록 경계에서 격리한다.
+        except Exception as exc:  # noqa: BLE001
             results.append(
                 RuleResult(
                     rule_id=rule.rule_id,

@@ -16,10 +16,10 @@ from __future__ import annotations
 import json
 import re
 import smtplib
+from collections.abc import Callable
 from dataclasses import dataclass
 from email.message import EmailMessage
 from pathlib import Path
-from typing import Callable
 
 from grant_radar.config import MailSettings
 
@@ -30,7 +30,9 @@ FAILURE_LOG_TAIL_LINES = 30
 _COMPANY_LINE = re.compile(r"^- 회사:\s*(?P<name>.+?)\s*\(")
 
 # "| 분야 | 판정 | 마감 | [제목](url) |" 또는 링크 없는 제목
-_TABLE_ROW = re.compile(r"^\|\s*(?P<cat>[^|]*?)\s*\|\s*(?P<dec>[^|]*?)\s*\|\s*(?P<end>[^|]*?)\s*\|\s*(?P<title>.*?)\s*\|\s*$")
+_TABLE_ROW = re.compile(
+    r"^\|\s*(?P<cat>[^|]*?)\s*\|\s*(?P<dec>[^|]*?)\s*\|\s*(?P<end>[^|]*?)\s*\|\s*(?P<title>.*?)\s*\|\s*$"
+)
 _MD_LINK = re.compile(r"^\[(?P<text>.*)\]\((?P<url>[^)]*)\)$")
 
 
@@ -62,7 +64,9 @@ def _a_summary_lines(markdown: str) -> list[str]:
         link = _MD_LINK.match(title)
         if link:
             title, url = link.group("text"), link.group("url")
-        out.append(f"- [{match.group('cat')}] {match.group('dec')} · 마감 {match.group('end')} · {title}")
+        out.append(
+            f"- [{match.group('cat')}] {match.group('dec')} · 마감 {match.group('end')} · {title}"
+        )
         if url:
             out.append(f"  {url}")
     return out
@@ -119,7 +123,9 @@ def _section(ref: ReportRef, markdown: str) -> tuple[list[str], int]:
     if a_lines:
         lines.extend(a_lines)
     else:
-        lines.append("관련 높음(A)·모집 중·검토 대상 공고가 없습니다. 첨부 보고서의 B 절을 확인하세요.")
+        lines.append(
+            "관련 높음(A)·모집 중·검토 대상 공고가 없습니다. 첨부 보고서의 B 절을 확인하세요."
+        )
     return lines, a_count
 
 
@@ -146,7 +152,10 @@ def build_report_message(
     """
     refs = _as_refs(reports, json_path)
     loaded: list[tuple[ReportRef, str | None]] = [
-        (ref, ref.report.read_text(encoding="utf-8") if ref.report and ref.report.is_file() else None)
+        (
+            ref,
+            ref.report.read_text(encoding="utf-8") if ref.report and ref.report.is_file() else None,
+        )
         for ref in refs
     ]
 
@@ -173,7 +182,9 @@ def build_report_message(
         label = _label_of(ref, markdown)
         if markdown is None:
             subject_parts.append(f"{label} 신규 없음")
-            body.extend([f"━ {label} ━", "", "지난 실행 이후 새로 관측된 모집 중 공고가 없습니다.", ""])
+            body.extend(
+                [f"━ {label} ━", "", "지난 실행 이후 새로 관측된 모집 중 공고가 없습니다.", ""]
+            )
             continue
         lines, a_count = _section(ref, markdown)
         if not subject_parts:
