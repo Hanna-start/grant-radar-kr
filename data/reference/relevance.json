@@ -1,0 +1,25 @@
+{
+  "_comment": "모든 회사에 적용할 보수적인 관련도 기본값. 회사별 정책은 회사 JSON의 matching_keywords, interest_keywords, exclude_keywords, exclude_categories, demote_keywords에 둔다.",
+  "exclude_title_keywords": [],
+  "exclude_title_keywords_latin": [],
+  "exclude_body_phrases": [],
+  "source_category_policy": {
+    "kstartup": {"priority": ["정책자금", "융자ㆍ보증", "인력", "판로ㆍ해외진출"]},
+    "bizinfo": {"priority": ["금융", "인력", "내수", "경영", "수출", "기술", "창업", "기타"]}
+  },
+  "positive_keywords": {
+    "고용": ["고용", "채용", "인건비", "근로자", "일자리", "육아휴직", "대체인력"],
+    "자금": ["융자", "보증", "이차보전", "정책자금", "대출", "보조금", "바우처", "지원금", "경영안정"],
+    "판로": ["판로", "입점", "마케팅", "구매상담", "공공구매", "전시회", "판촉"]
+  },
+  "strong_groups_in_title": ["회사 업종", "고용"],
+  "strong_title_keywords": {},
+  "body_groups": ["회사 업종", "고용", "자금"],
+  "tier_a_rules": {"min_distinct_positive": 2, "priority_categories_with_any_positive": ["인력", "금융"]},
+  "demote_title_keywords": [],
+  "tier_a_requires_title_signal_categories": [],
+  "exclusion_override_groups": ["회사 업종", "고용"],
+  "strong_title_needs_support": [],
+  "seoul_districts": ["종로구", "중구", "용산구", "성동구", "광진구", "동대문구", "중랑구", "성북구", "강북구", "도봉구", "노원구", "은평구", "서대문구", "마포구", "양천구", "강서구", "구로구", "금천구", "영등포구", "동작구", "관악구", "서초구", "강남구", "송파구", "강동구"],
+  "city_token_stopwords": ["상시", "수시", "즉시", "동시", "도시", "전시", "표시", "게시", "실시", "명시", "공시", "개시", "당시", "잠시", "일시", "정시", "임시", "해시", "서울시", "서울특별시", "광역시", "특별시", "특별자치시", "세종시", "조시", "감시", "무시", "중시", "응시", "검시", "시군"]
+}

@@ -1,0 +1,55 @@
+{
+  "_comment": "기업마당(bizinfo) 골든 표본. 실제 응답 구조(2026-08-21 관찰)를 본뜬 가상 공고 4건 — 지역 PASS/FAIL, 신청대상 REVIEW, 기간 변형, 마감 경로를 커버한다.",
+  "response": {
+    "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+    "body": {
+      "items": {
+        "item": [
+          {
+            "pblancId": "PBLN_GOLD_000000001",
+            "pblancNm": "[서울] 골든 중소기업 경영 지원",
+            "hashtags": "경영,서울,서울특별시,중소기업",
+            "trgetNm": "중소기업",
+            "reqstBeginEndDe": "2026-07-01 ~ 2026-09-30",
+            "pldirSportRealmLclasCodeNm": "경영",
+            "jrsdInsttNm": "가상기관",
+            "pblancUrl": "https://example.test/detail?pblancId=PBLN_GOLD_000000001"
+          },
+          {
+            "pblancId": "PBLN_GOLD_000000002",
+            "pblancNm": "[울산] 골든 지역 한정 지원",
+            "hashtags": "기술,울산,울산광역시,중소기업",
+            "trgetNm": "중소기업",
+            "reqstBeginEndDe": "2026-07-01 ~ 2026-09-30",
+            "pldirSportRealmLclasCodeNm": "기술",
+            "jrsdInsttNm": "울산광역시",
+            "pblancUrl": "https://example.test/detail?pblancId=PBLN_GOLD_000000002"
+          },
+          {
+            "pblancId": "PBLN_GOLD_000000003",
+            "pblancNm": "골든 소상공인 상시 지원",
+            "hashtags": "금융,서울,부산,대구,인천,전남광주,대전,울산,세종,경기,강원,충북,충남,전북,경북,경남,제주",
+            "trgetNm": "소상공인",
+            "reqstBeginEndDe": "예산 소진시까지",
+            "pldirSportRealmLclasCodeNm": "금융",
+            "jrsdInsttNm": "중소벤처기업부",
+            "pblancUrl": "https://example.test/detail?pblancId=PBLN_GOLD_000000003"
+          },
+          {
+            "pblancId": "PBLN_GOLD_000000004",
+            "pblancNm": "[서울] 골든 마감된 인력 지원",
+            "hashtags": "인력,서울,서울특별시",
+            "trgetNm": "중소기업",
+            "reqstBeginEndDe": "2026-07-01 ~ 2026-07-10",
+            "pldirSportRealmLclasCodeNm": "인력",
+            "jrsdInsttNm": "고용노동부",
+            "pblancUrl": "https://example.test/detail?pblancId=PBLN_GOLD_000000004"
+          }
+        ]
+      },
+      "numOfRows": 4,
+      "pageNo": 1,
+      "totalCount": 4
+    }
+  }
+}

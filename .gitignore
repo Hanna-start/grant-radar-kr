@@ -1,0 +1,35 @@
+# 비밀정보 - 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
+# 실제 회사 데이터 - 절대 커밋하지 않는다 (data/sample_company.json 가상회사는 예외)
+data/company.json
+data/company_*.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+
+# 데이터
+*.db
+data/raw/
+reports/
+
+# 정기 실행 상태·로그
+logs/
+data/last_success.txt
+
+# 실제 회사 서류·정보 - 절대 커밋하지 않는다
+.private/
+
+# 로컬 작업 지침·세션 로그 - 공개 저장소에 포함하지 않는다
+CLAUDE.md
+CONTEXT.md
