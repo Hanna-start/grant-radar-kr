@@ -40,6 +40,7 @@ from grant_radar.reporting.console import (
     render_json_report,
     render_markdown_report,
 )
+from grant_radar.reporting.manifest import update_run_manifest
 from grant_radar.services.evaluation import evaluate_stored
 from grant_radar.services.ingestion import KST, IngestOutcome, ingest_page
 from grant_radar.storage.sqlite import AnnouncementStore
@@ -48,6 +49,7 @@ RAW_DIR = Path("data") / "raw"
 DB_PATH = Path("data") / "announcements.db"
 COMPANY_PATH = Path("data") / "company.json"  # 실제 회사 데이터 (Git 제외)
 SAMPLE_COMPANY_PATH = Path("data") / "sample_company.json"
+RUN_MANIFEST_PATH = Path("data") / "run_manifest.json"
 
 
 def default_company_path() -> Path:
@@ -148,6 +150,9 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
     all_outcomes: list[IngestOutcome] = []
     total = 0
     total_count: int | None = None
+    pages_fetched = 0
+    stop_reason = "page-limit-reached"
+    started_at = datetime.now(KST)
     try:
         with factory(settings.api_key) as client, AnnouncementStore(DB_PATH) as store:
             for offset in range(pages):
@@ -156,6 +161,7 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
                     # 연속 조회 간 대기. API 호출 한도가 미확인이므로 보수적으로 둔다.
                     time.sleep(0.5)
                 result = client.fetch_announcements_page(page=page, per_page=args.per_page)
+                pages_fetched += 1
                 print(
                     f"[성공] {source}: HTTP {result.status_code}, "
                     f"page={result.page}, perPage={result.per_page}"
@@ -177,18 +183,61 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
                 if page_total is not None:
                     total_count = page_total
                 if not outcomes:
+                    stop_reason = "empty-page"
                     break  # 빈 페이지 = 더 가져올 데이터 없음
                 if total_count is not None and page * args.per_page >= total_count:
+                    stop_reason = "reported-total-reached"
                     break
             total = store.count()
     except KStartupApiError as exc:
         print(f"[오류] {exc}", file=sys.stderr)
         if all_outcomes:
             print(f"[중단] 오류 전까지 수집분 {len(all_outcomes)}건은 저장되어 있습니다.")
+        update_run_manifest(
+            RUN_MANIFEST_PATH,
+            _manifest_run(
+                source,
+                started_at,
+                "failed",
+                "api-error",
+                pages_fetched,
+                len(all_outcomes),
+                total_count,
+                [f"{type(exc).__name__}: {exc}"],
+            ),
+        )
         return 1
     except (NormalizationError, BizinfoNormalizationError) as exc:
         print(f"[오류] 정규화 실패: {exc}", file=sys.stderr)
+        update_run_manifest(
+            RUN_MANIFEST_PATH,
+            _manifest_run(
+                source,
+                started_at,
+                "failed",
+                "normalization-error",
+                pages_fetched,
+                len(all_outcomes),
+                total_count,
+                [f"{type(exc).__name__}: {exc}"],
+            ),
+        )
         return 1
+
+    status = "complete" if stop_reason in {"empty-page", "reported-total-reached"} else "partial"
+    manifest_path = update_run_manifest(
+        RUN_MANIFEST_PATH,
+        _manifest_run(
+            source,
+            started_at,
+            status,
+            stop_reason,
+            pages_fetched,
+            len(all_outcomes),
+            total_count,
+            [],
+        ),
+    )
 
     print(format_ingest_summary(all_outcomes, total))
     changed = [o for o in all_outcomes if o.change in ("NEW", "UPDATED")]
@@ -199,7 +248,30 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
             print(f"  {outcome.change}: [{ann.source_id}] {ann.title}{marker}")
     else:
         print(f"  (신규·변경 {len(changed)}건 — 목록은 evaluate 보고서에서 확인)")
+    print(f"[매니페스트] {manifest_path} ({status})")
     return 0
+
+
+def _manifest_run(
+    source: str,
+    started_at: datetime,
+    status: str,
+    stop_reason: str,
+    pages_fetched: int,
+    collected: int,
+    reported_total: int | None,
+    errors: list[str],
+) -> dict[str, Any]:
+    return {
+        "source": source,
+        "started_at": started_at.isoformat(timespec="seconds"),
+        "status": status,
+        "pages_fetched": pages_fetched,
+        "collected": collected,
+        "reported_total": reported_total,
+        "stop_reason": stop_reason,
+        "errors": errors,
+    }
 
 
 def format_ingest_summary(outcomes: list[IngestOutcome], total_stored: int) -> str:

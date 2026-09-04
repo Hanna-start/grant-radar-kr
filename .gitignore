@@ -21,6 +21,8 @@ dist/
 # 데이터
 *.db
 data/raw/
+data/run_manifest.json
+data/run_manifest.json.corrupt-*
 reports/
 
 # 정기 실행 상태·로그

@@ -462,6 +462,9 @@ def test_fetch_pages_collects_consecutive_pages(tmp_path, monkeypatch, capsys):
     assert calls == [1, 2]
     assert "신규 4건" in captured.out
     assert "저장소 누적 4건" in captured.out
+    manifest = json.loads((tmp_path / "data" / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["runs"][0]["status"] == "partial"
+    assert manifest["runs"][0]["stop_reason"] == "page-limit-reached"
 
 
 def test_fetch_pages_stops_at_total_count(tmp_path, monkeypatch, capsys):
@@ -479,6 +482,9 @@ def test_fetch_pages_stops_at_total_count(tmp_path, monkeypatch, capsys):
     # 2페이지에서 totalCount(3)에 도달하므로 3페이지는 호출하지 않는다
     assert calls == [1, 2]
     assert "신규 3건" in captured.out
+    manifest = json.loads((tmp_path / "data" / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["runs"][0]["status"] == "complete"
+    assert manifest["runs"][0]["reported_total"] == 3
 
 
 def test_fetch_pages_stops_on_empty_page(tmp_path, monkeypatch, capsys):
@@ -629,6 +635,10 @@ def test_fetch_pages_partial_failure_keeps_earlier_pages(tmp_path, monkeypatch, 
     stored = conn.execute("SELECT COUNT(*) FROM announcements").fetchone()[0]
     conn.close()
     assert stored == 1
+    manifest = json.loads((tmp_path / "data" / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["runs"][0]["status"] == "failed"
+    assert manifest["runs"][0]["pages_fetched"] == 1
+    assert manifest["runs"][0]["collected"] == 1
 
 
 def _two_items_one_closed():

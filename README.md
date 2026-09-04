@@ -23,6 +23,9 @@ K-Startup과 기업마당의 공개 지원사업 공고를 수집·정규화해 
 - 선택: 회사 프로필 판정, 관련도 A/B/C, 보고서, Windows 주간 실행과 SMTP 메일
 - 제외: 웹 UI, 지원 자격 확정, 자동 신청, 공고 첨부파일 전문 분석
 
+가상 데이터로 만든 출력 형태는 [examples/sample-results.md](examples/sample-results.md),
+수집 범위와 완료 상태 정의는 [docs/sources.md](docs/sources.md)에서 볼 수 있습니다.
+
 ## 해결하려는 문제
 
 정부·공공기관의 지원사업 공고는 여러 곳에 흩어져 있고, 각 공고의 자격
@@ -104,6 +107,7 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 
 수집만 원하는 경우 여기까지 실행하면 됩니다. 결과는
 `data/announcements.db`에 누적되며 회사 프로필이나 메일 설정은 필요하지 않습니다.
+각 실행의 수집 범위와 종료 상태는 `data/run_manifest.json`에 기록됩니다.
 
 수집 원천은 `--source`로 선택합니다. 기본은 K-Startup(창업지원)이고,
 `bizinfo`는 기업마당(중소기업 지원사업 — 인력·금융 분야 포함)입니다.
@@ -279,6 +283,12 @@ C는 제외가 아니라 배치이며 판정 결과는 바뀌지 않습니다.
 - "우선 검토" 판정이 자격 확정이나 선정 가능성을 의미하지 않습니다.
 
 자세한 내용은 [docs/limitations.md](docs/limitations.md)를 참고하세요.
+
+## 참고한 프로젝트
+
+수집 범위를 기계가 읽을 수 있는 실행 매니페스트로 남기는 아이디어는 MIT 라이선스의
+[djfksjd/ir-search](https://github.com/djfksjd/ir-search)에서 영감을 받았습니다.
+구현은 이 저장소의 API·SQLite 구조에 맞게 독립적으로 작성했습니다.
 
 ## 프로젝트 상태와 향후 범위
 
