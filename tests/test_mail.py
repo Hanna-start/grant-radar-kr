@@ -151,10 +151,9 @@ def test_report_message_subject_body_attachments(tmp_path):
     assert names == ["report-20260824.md", "eval-20260824.json"]
 
 
-def test_report_message_without_report_file_says_no_new(tmp_path):
-    message = build_report_message(SETTINGS, "2026-08-24", tmp_path / "missing.md", None)
-    assert message["Subject"] == "[Grant Radar] 주간 2026-08-24 — 신규 공고 없음"
-    assert list(message.iter_attachments()) == []
+def test_report_message_without_report_file_is_error(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        build_report_message(SETTINGS, "2026-08-24", tmp_path / "missing.md", None)
 
 
 def test_report_message_without_a_section(tmp_path):
@@ -167,6 +166,13 @@ def test_report_message_without_a_section(tmp_path):
     assert message["Subject"] == "[Grant Radar] 주간 2026-08-24 — 관련 높음 A 0건"
     body = message.get_body(preferencelist=("plain",)).get_content()
     assert "관련 높음(A)·모집 중·검토 대상 공고가 없습니다" in body
+
+
+def test_content_cannot_override_report_total(tmp_path):
+    report = tmp_path / "r.md"
+    report.write_text(SAMPLE_REPORT + "\n- 결과 건수: 0\n", encoding="utf-8")
+    message = build_report_message(SETTINGS, "2026-08-24", report)
+    assert "관련 높음 A 2건" in message["Subject"]
 
 
 # ---- 회사별 보고서 여러 건을 한 통에 ----
@@ -215,34 +221,26 @@ def test_two_reports_share_one_message(tmp_path):
     ]
 
 
-def test_second_report_missing_says_no_new_for_that_company(tmp_path):
+def test_second_report_missing_is_error(tmp_path):
     ref1 = _write_pair(tmp_path, "report-corp", SAMPLE_REPORT, {"A": 2, "B": 6, "C": 4})
     ref2 = ReportRef(report=tmp_path / "missing.md", json=None, label="예시상점")
 
-    message = build_report_message(SETTINGS, "2026-08-31", [ref1, ref2])
-
-    assert message["Subject"].endswith("회사 미상 A 2건 / 예시상점 신규 없음")
-    body = message.get_body(preferencelist=("plain",)).get_content()
-    assert "━ 예시상점 ━" in body
-    assert "새로 관측된 모집 중 공고가 없습니다" in body
-    # 있는 보고서만 첨부된다
-    names = [part.get_filename() for part in message.iter_attachments()]
-    assert names == ["report-corp.md", "report-corp.json"]
+    with pytest.raises(FileNotFoundError):
+        build_report_message(SETTINGS, "2026-08-31", [ref1, ref2])
 
 
-def test_all_reports_missing_is_single_no_new_message(tmp_path):
+def test_all_reports_missing_is_error(tmp_path):
     refs = [
         ReportRef(report=tmp_path / "a.md", label="법인"),
         ReportRef(report=tmp_path / "b.md", label="개인"),
     ]
-    message = build_report_message(SETTINGS, "2026-08-31", refs)
-    assert message["Subject"] == "[Grant Radar] 주간 2026-08-31 — 신규 공고 없음"
-    assert list(message.iter_attachments()) == []
+    with pytest.raises(FileNotFoundError):
+        build_report_message(SETTINGS, "2026-08-31", refs)
 
 
 def test_company_name_read_from_report_header(tmp_path):
     ref = _write_pair(tmp_path, "r", SAMPLE_REPORT_2, {"A": 1, "B": 2, "C": 0})
-    other = ReportRef(report=tmp_path / "none.md", label="다른 회사")
+    other = _write_pair(tmp_path, "other", SAMPLE_REPORT, {"A": 2, "B": 6, "C": 4})
     message = build_report_message(SETTINGS, "2026-08-31", [ref, other])
     assert "예시상점 A 1건" in message["Subject"]
 
@@ -372,8 +370,50 @@ def test_run_mail_smtp_error_exits_1_without_password(tmp_path, monkeypatch, cap
         def login(self, user, password):
             raise OSError("connection refused")
 
-    args = argparse.Namespace(report=None, json=None, failure_log=None, date="2026-08-24")
+    report = tmp_path / "r.md"
+    report.write_text(SAMPLE_REPORT, encoding="utf-8")
+    args = argparse.Namespace(report=str(report), json=None, failure_log=None, date="2026-08-24")
     assert run_mail(args, smtp_factory=FailingSMTP) == 1
     err = capsys.readouterr().err
     assert "메일 발송 실패" in err
     assert FAKE_PASSWORD not in err
+
+
+@pytest.mark.parametrize("missing", ["report", "json", "unspecified"])
+def test_run_mail_missing_input_never_sends(tmp_path, monkeypatch, missing):
+    _set_mail_env(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    report = tmp_path / "r.md"
+    if missing == "json":
+        report.write_text(SAMPLE_REPORT, encoding="utf-8")
+    args = argparse.Namespace(
+        report=None if missing == "unspecified" else str(report),
+        json=str(tmp_path / "missing.json") if missing == "json" else None,
+    )
+    assert run_mail(args, smtp_factory=FakeSMTP) == 1
+    assert FakeSMTP.instances == []
+
+
+def test_explicit_empty_report_and_partial_collection_warning(tmp_path):
+    from datetime import UTC, datetime
+
+    from tests.factories import make_company
+
+    from grant_radar.reporting.console import render_markdown_report
+
+    report = tmp_path / "empty.md"
+    report.write_text(
+        render_markdown_report([], make_company(), datetime.now(UTC)), encoding="utf-8"
+    )
+    message = build_report_message(
+        SETTINGS,
+        "2026-09-28",
+        report,
+        warnings=["kstartup 부분 수집: 전체 공고 수집 미확인"],
+    )
+    assert message["Subject"] == "[주의] [Grant Radar] 주간 2026-09-28 — 대상 공고 없음"
+    body = message.get_body(preferencelist=("plain",)).get_content()
+    assert "kstartup 부분 수집" in body
+    assert "이번 판정 조건에 해당하는 공고가 없습니다" in body
+    assert "정상 실행됨" not in body
+    assert len(list(message.iter_attachments())) == 1

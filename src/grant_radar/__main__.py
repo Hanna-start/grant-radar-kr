@@ -90,7 +90,7 @@ def extract_total_count(data: Any, source: str) -> int | None:
         else:
             value = data.get("totalCount")
         return int(value)
-    except (KeyError, TypeError, ValueError):
+    except (AttributeError, KeyError, TypeError, ValueError):
         return None
 
 
@@ -136,6 +136,10 @@ def save_raw_result(result: FetchResult, raw_dir: Path, source: str = "kstartup"
 
 
 def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
+    pages = getattr(args, "pages", 1)
+    if any(value < 1 for value in (args.page, args.per_page, pages)):
+        print("[오류] --page, --per-page, --pages는 1 이상이어야 합니다.", file=sys.stderr)
+        return 1
     try:
         settings = load_settings()
     except ConfigError as exc:
@@ -146,8 +150,14 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
     spec = SOURCES[source]
     factory = client_factory if client_factory is not None else spec["client"]
 
-    pages = max(1, getattr(args, "pages", 1) or 1)
+    scope = {
+        "start_page": args.page,
+        "requested_pages": pages,
+        "requested_per_page": args.per_page,
+    }
     all_outcomes: list[IngestOutcome] = []
+    seen_ids: set[tuple[str, str]] = set()
+    reported_totals: set[int] = set()
     total = 0
     total_count: int | None = None
     pages_fetched = 0
@@ -179,13 +189,19 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
                     normalizer=spec["normalizer"],
                 )
                 all_outcomes.extend(outcomes)
+                seen_ids.update(
+                    (o.announcement.source, o.announcement.source_id)
+                    for o in outcomes
+                    if o.announcement.source_id is not None
+                )
                 page_total = extract_total_count(result.data, source)
                 if page_total is not None:
                     total_count = page_total
+                    reported_totals.add(page_total)
                 if not outcomes:
                     stop_reason = "empty-page"
                     break  # 빈 페이지 = 더 가져올 데이터 없음
-                if total_count is not None and page * args.per_page >= total_count:
+                if args.page == 1 and total_count is not None and len(seen_ids) >= total_count:
                     stop_reason = "reported-total-reached"
                     break
             total = store.count()
@@ -204,6 +220,7 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
                 len(all_outcomes),
                 total_count,
                 [f"{type(exc).__name__}: {exc}"],
+                **scope,
             ),
         )
         return 1
@@ -220,11 +237,19 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
                 len(all_outcomes),
                 total_count,
                 [f"{type(exc).__name__}: {exc}"],
+                **scope,
             ),
         )
         return 1
 
-    status = "complete" if stop_reason in {"empty-page", "reported-total-reached"} else "partial"
+    complete = (
+        args.page == 1
+        and stop_reason in {"empty-page", "reported-total-reached"}
+        and (total_count is None or len(seen_ids) >= total_count)
+        and len(reported_totals) <= 1
+        and all(o.change != "UNKNOWN" for o in all_outcomes)
+    )
+    status = "complete" if complete else "partial"
     manifest_path = update_run_manifest(
         RUN_MANIFEST_PATH,
         _manifest_run(
@@ -236,6 +261,7 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
             len(all_outcomes),
             total_count,
             [],
+            **scope,
         ),
     )
 
@@ -249,6 +275,8 @@ def run_fetch(args: argparse.Namespace, client_factory=None) -> int:
     else:
         print(f"  (신규·변경 {len(changed)}건 — 목록은 evaluate 보고서에서 확인)")
     print(f"[매니페스트] {manifest_path} ({status})")
+    if status == "partial":
+        print("[주의] 부분 수집입니다. 이번 실행으로 전체 공고 수집을 확인하지 못했습니다.")
     return 0
 
 
@@ -261,12 +289,21 @@ def _manifest_run(
     collected: int,
     reported_total: int | None,
     errors: list[str],
+    *,
+    start_page: int,
+    requested_pages: int,
+    requested_per_page: int,
 ) -> dict[str, Any]:
     return {
         "source": source,
         "started_at": started_at.isoformat(timespec="seconds"),
         "status": status,
         "pages_fetched": pages_fetched,
+        "start_page": start_page,
+        "last_page": start_page + pages_fetched - 1 if pages_fetched else None,
+        "requested_pages": requested_pages,
+        "requested_per_page": requested_per_page,
+        "range_complete": status != "failed",
         "collected": collected,
         "reported_total": reported_total,
         "stop_reason": stop_reason,
@@ -332,15 +369,13 @@ def run_evaluate(args: argparse.Namespace) -> int:
         evaluations = evaluate_stored(store, company, since=since)
 
     if stored_total == 0:
-        print("저장된 공고가 없습니다. 먼저 fetch를 실행하세요.", file=sys.stderr)
-        return 1
+        print("[안내] 저장된 공고가 0건입니다. 수집 범위를 확인하세요.")
     if open_only:
         evaluations = [evaluation for evaluation in evaluations if not evaluation.closed]
 
     print(render_console_report(evaluations, company, filters))
     if not evaluations:
         print("\n필터 조건에 해당하는 공고가 없습니다.")
-        return 0
 
     generated_at = datetime.now(KST)
     report_path = getattr(args, "report", None)
@@ -389,7 +424,7 @@ def build_report_refs(args: argparse.Namespace) -> list[ReportRef]:
     jsons = as_list(getattr(args, "json", None))
     labels = as_list(getattr(args, "label", None))
     if not reports:
-        return [ReportRef(report=None, json=None, label=labels[0] if labels else None)]
+        raise ValueError("--report로 생성된 보고서를 지정하세요. 파일 부재는 신규 0건이 아닙니다.")
     for name, values in (("--json", jsons), ("--label", labels)):
         if values and len(values) != len(reports):
             raise ValueError(
@@ -409,8 +444,8 @@ def build_report_refs(args: argparse.Namespace) -> list[ReportRef]:
 def run_mail(args: argparse.Namespace, smtp_factory=None) -> int:
     """보고서(또는 실패 로그)를 메일로 보낸다. scripts/weekly_run.ps1이 호출한다.
 
-    --report 파일이 없으면 '신규 공고 없음' 메일을 보낸다 (run이 신규 0건이면
-    보고서를 쓰지 않으므로). --failure-log가 주어지면 실패 메일만 보낸다.
+    --report 파일이 없으면 오류로 종료한다. 0건도 명시적인 보고서를 사용한다.
+    --failure-log가 주어지면 실패 메일만 보낸다.
     """
     try:
         settings = load_mail_settings()
@@ -424,10 +459,12 @@ def run_mail(args: argparse.Namespace, smtp_factory=None) -> int:
     else:
         try:
             refs = build_report_refs(args)
-        except ValueError as exc:
+            message = build_report_message(
+                settings, run_date, refs, warnings=getattr(args, "warning", None)
+            )
+        except (OSError, ValueError) as exc:
             print(f"[오류] {exc}", file=sys.stderr)
             return 1
-        message = build_report_message(settings, run_date, refs)
     try:
         send_message(message, settings, smtp_factory)
     except (OSError, smtplib.SMTPException) as exc:
@@ -523,7 +560,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         metavar="TEXT",
-        help="보고서가 없을 때(신규 0건) 절 제목에 쓸 회사 이름 (--report와 같은 순서)",
+        help="보고서 머리에 회사명이 없을 때 쓸 이름 (--report와 같은 순서)",
+    )
+    mail_parser.add_argument(
+        "--warning",
+        action="append",
+        default=None,
+        help="제목과 본문에 표시할 실행 주의사항 (여러 번 지정 가능)",
     )
     mail_parser.add_argument(
         "--failure-log",

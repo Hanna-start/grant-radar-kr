@@ -384,12 +384,15 @@ def render_markdown_report(
         "# Grant Radar KR 판정 보고서",
         "",
         f"- 생성 시각: {generated_at.isoformat(timespec='minutes')}",
+        f"- 결과 건수: {len(ordered)}",
         f"- {summary_line(ordered, company)[len('[판정 요약] ') :]}",
         f"- 관련도: {relevance_summary(scored)[len('[관련도] ') :]}",
     ]
     if filters:
         parts.append(f"- 필터: {' / '.join(filters)}")
     parts.extend(["", f"> {DISCLAIMER}"])
+    if not ordered:
+        parts.extend(["", "이번 판정 조건에 해당하는 공고가 없습니다."])
     parts.extend(_render_a_summary(scored))
     parts.extend(_render_sections(scored, lambda title: [f"## {title}"]))
     parts.append("")

@@ -1,4 +1,4 @@
-# Grant Radar KR 주간 자동 실행 (PowerShell 5.1 호환)
+﻿# Grant Radar KR 주간 자동 실행 (PowerShell 5.1 호환)
 # 공고는 원천별로 한 번만 수집하고, 발견된 회사 프로필마다 별도로 판정해 한 통의 메일로 보낸다.
 # 회사 프로필: data/company.json, data/company_*.json. 둘 다 없으면 가상 샘플을 사용한다.
 
@@ -54,6 +54,7 @@ if ($CompanyFiles.Count -eq 0) {
 }
 
 Write-Log "주간 실행 시작 (since=$Since, 회사 프로필=$($CompanyFiles.Count)개)"
+$CollectionWarnings = @()
 foreach ($FetchArgs in @(
     @("fetch", "--per-page", "100", "--pages", "3"),
     @("fetch", "--source", "bizinfo", "--per-page", "100", "--pages", "17")
@@ -64,9 +65,30 @@ foreach ($FetchArgs in @(
         Invoke-Radar @("mail", "--failure-log", $Log, "--date", $RunDate) | Out-Null
         exit 1
     }
+    $Source = if ($FetchArgs -contains "bizinfo") { "bizinfo" } else { "kstartup" }
+    try {
+        $Manifest = Get-Content (Join-Path $Root "data\run_manifest.json") -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $Runs = @($Manifest.runs | Where-Object { $_.source -eq $Source })
+        if ($Runs.Count -ne 1 -or $Runs[0].status -notin @("complete", "partial")) {
+            throw "수집 완료 상태를 확인할 수 없습니다: $Source"
+        }
+        $Run = $Runs[0]
+        if ($Run.status -eq "partial") {
+            $WarningText = "$Source 부분 수집: 페이지 $($Run.start_page)~$($Run.last_page), $($Run.collected)건. 전체 공고 수집은 확인되지 않았습니다."
+            $CollectionWarnings += $WarningText
+            Write-Log "[주의] $WarningText"
+        }
+    } catch {
+        Write-Log "수집 매니페스트 확인 실패: $_"
+        Invoke-Radar @("mail", "--failure-log", $Log, "--date", $RunDate) | Out-Null
+        exit 1
+    }
 }
 
 $MailArgs = @("mail")
+foreach ($WarningText in $CollectionWarnings) {
+    $MailArgs += @("--warning", $WarningText)
+}
 $Index = 0
 foreach ($CompanyFile in $CompanyFiles) {
     $Index += 1
@@ -97,7 +119,7 @@ if ($code -ne 0) {
 }
 
 $StartedIso | Out-File -FilePath $StateFile -Encoding ascii
-Write-Log "성공 — last_success=$StartedIso"
+Write-Log "선택 범위 보고 성공 (부분 수집 원천=$($CollectionWarnings.Count)) — last_success=$StartedIso"
 
 $cutoff = (Get-Date).AddDays(-30)
 $old = @(Get-ChildItem (Join-Path $Root "data\raw") -File -ErrorAction SilentlyContinue |

@@ -89,7 +89,7 @@ class ReportRef:
 
     report: Path | None
     json: Path | None = None
-    # 보고서 파일이 없을 때(신규 0건) 쓸 이름. 파일이 있으면 보고서 머리에서 회사명을 읽는다.
+    # 보고서 머리에 회사명이 없을 때 쓸 이름.
     label: str | None = None
 
 
@@ -120,13 +120,20 @@ def _section(ref: ReportRef, markdown: str) -> tuple[list[str], int]:
     a_count = sum(1 for line in a_lines if line.startswith("- ["))
     lines = list(_header_bullets(markdown))
     lines.append("")
-    if a_lines:
+    if _is_empty_report(markdown):
+        lines.append("이번 판정 조건에 해당하는 공고가 없습니다. 수집 범위도 확인하세요.")
+    elif a_lines:
         lines.extend(a_lines)
     else:
         lines.append(
             "관련 높음(A)·모집 중·검토 대상 공고가 없습니다. 첨부 보고서의 B 절을 확인하세요."
         )
     return lines, a_count
+
+
+def _is_empty_report(markdown: str) -> bool:
+    """생성된 보고서의 명시적 건수로만 0건을 판단한다."""
+    return "- 결과 건수: 0" in _header_bullets(markdown)
 
 
 def _attachments_of(ref: ReportRef, markdown: str) -> list[tuple[str, str, bytes]]:
@@ -143,60 +150,54 @@ def build_report_message(
     run_date: str,
     reports,
     json_path: Path | None = None,
+    *,
+    warnings: list[str] | None = None,
 ) -> EmailMessage:
     """보고서 메일. `reports`는 경로 하나 또는 ReportRef 목록(회사별 보고서).
 
-    보고서 파일이 하나도 없으면 '신규 공고 없음' 메일을 만든다 (`run --since`가
-    신규 0건이면 보고서 파일을 쓰지 않고 정상 종료하므로, 그 경우도 메일은 보내
-    '실행은 됐다'를 알린다).
+    지정된 파일은 모두 있어야 한다. 파일 누락을 정상 실행·신규 0건으로 해석하지 않는다.
     """
     refs = _as_refs(reports, json_path)
-    loaded: list[tuple[ReportRef, str | None]] = [
-        (
-            ref,
-            ref.report.read_text(encoding="utf-8") if ref.report and ref.report.is_file() else None,
-        )
-        for ref in refs
-    ]
+    if not refs:
+        raise ValueError("보낼 보고서를 지정하세요.")
+    loaded: list[tuple[ReportRef, str]] = []
+    for ref in refs:
+        if ref.report is None:
+            raise ValueError("보낼 보고서를 지정하세요.")
+        for path in (ref.report, ref.json):
+            if path is not None and not path.is_file():
+                raise FileNotFoundError(f"보고서 파일을 찾을 수 없습니다: {path}")
+        loaded.append((ref, ref.report.read_text(encoding="utf-8")))
 
     message = EmailMessage()
     message["From"] = settings.user
     message["To"] = settings.to
 
-    if all(markdown is None for _, markdown in loaded):
-        message["Subject"] = f"{SUBJECT_PREFIX} 주간 {run_date} — 신규 공고 없음"
-        message.set_content(
-            f"Grant Radar KR 주간 실행 ({run_date})\n\n"
-            "지난 실행 이후 새로 관측된 모집 중 공고가 없어 보고서가 생성되지 않았습니다.\n"
-            "(수집·판정은 정상 실행됨)\n"
-        )
-        return message
-
     single = len(loaded) == 1
     body = [f"Grant Radar KR 주간 보고 ({run_date})", ""]
+    if warnings:
+        body.extend([*[f"[주의] {warning}" for warning in warnings], ""])
     attachments: list[tuple[str, str, bytes]] = []
     subject_parts: list[str] = []
     first_a_count = 0
 
     for ref, markdown in loaded:
         label = _label_of(ref, markdown)
-        if markdown is None:
-            subject_parts.append(f"{label} 신규 없음")
-            body.extend(
-                [f"━ {label} ━", "", "지난 실행 이후 새로 관측된 모집 중 공고가 없습니다.", ""]
-            )
-            continue
         lines, a_count = _section(ref, markdown)
         if not subject_parts:
             first_a_count = a_count
-        subject_parts.append(f"{label} A {a_count}건")
+        subject_parts.append(
+            f"{label} 대상 없음" if _is_empty_report(markdown) else f"{label} A {a_count}건"
+        )
         if not single:
             body.extend([f"━ {label} ━", ""])
         body.extend(lines)
         body.append("")
         attachments.extend(_attachments_of(ref, markdown))
 
-    if single:
+    if all(_is_empty_report(markdown) for _, markdown in loaded):
+        subject = f"{SUBJECT_PREFIX} 주간 {run_date} — 대상 공고 없음"
+    elif single:
         # 기존 단일 보고서 메일의 제목 형식을 그대로 유지한다 (2026-08-23 발송 확인분).
         subject = f"{SUBJECT_PREFIX} 주간 {run_date} — 관련 높음 A {first_a_count}건"
         counts = _tier_counts(loaded[0][0].json)
@@ -204,7 +205,7 @@ def build_report_message(
             subject += f" (A {counts['A']} / B {counts['B']} / C {counts['C']})"
     else:
         subject = f"{SUBJECT_PREFIX} 주간 {run_date} — " + " / ".join(subject_parts)
-    message["Subject"] = subject
+    message["Subject"] = f"[주의] {subject}" if warnings else subject
 
     names = [name for name, _, _ in attachments]
     body.append(f"첨부: {', '.join(names)}" if names else "첨부 없음")

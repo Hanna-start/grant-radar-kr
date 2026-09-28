@@ -487,6 +487,83 @@ def test_fetch_pages_stops_at_total_count(tmp_path, monkeypatch, capsys):
     assert manifest["runs"][0]["reported_total"] == 3
 
 
+@pytest.mark.parametrize(
+    ("start", "limit", "actual_size", "total", "expected_status", "expected_collected"),
+    [
+        (3, 1, 2, 6, "partial", 2),
+        (1, 1, 2, 6, "partial", 2),
+        (1, 3, 2, 6, "complete", 6),
+        (4, 1, 2, 6, "partial", 0),
+    ],
+)
+def test_fetch_tracks_actual_scope(
+    tmp_path,
+    monkeypatch,
+    capsys,
+    start,
+    limit,
+    actual_size,
+    total,
+    expected_status,
+    expected_collected,
+):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("grant_radar.__main__.time.sleep", lambda _: None)
+    calls = []
+    # 요청은 100건이지만 서버가 페이지당 2건만 반환하는 상황도 포함한다.
+    handler = _paged_handler(calls, total_count=total, per_page=actual_size)
+    assert (
+        run_fetch(
+            fetch_args(page=start, pages=limit, per_page=100, no_save=True),
+            client_factory=make_factory(handler),
+        )
+        == 0
+    )
+    run = json.loads((tmp_path / "data/run_manifest.json").read_text(encoding="utf-8"))["runs"][0]
+    assert run["status"] == expected_status
+    assert run["collected"] == expected_collected
+    assert run["start_page"] == start
+    assert run["last_page"] == calls[-1]
+    assert run["requested_pages"] == limit
+    assert run["requested_per_page"] == 100
+    assert run["range_complete"] is True
+    if expected_status == "partial":
+        assert "부분 수집" in capsys.readouterr().out
+
+
+def test_repeated_or_missing_ids_do_not_prove_complete(tmp_path, monkeypatch):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("grant_radar.__main__.time.sleep", lambda _: None)
+
+    def handler(request):
+        page = int(request.url.params["page"])
+        items = [{"pbanc_sn": 1}, {"biz_pbanc_nm": "ID 누락"}] if page < 3 else []
+        return httpx.Response(200, json={"totalCount": 4, "data": items})
+
+    assert run_fetch(fetch_args(pages=3), client_factory=make_factory(handler)) == 0
+    run = json.loads((tmp_path / "data/run_manifest.json").read_text(encoding="utf-8"))["runs"][0]
+    assert run["status"] == "partial"
+    assert run["stop_reason"] == "empty-page"
+
+
+def test_changing_total_does_not_prove_complete(tmp_path, monkeypatch):
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("grant_radar.__main__.time.sleep", lambda _: None)
+
+    def handler(request):
+        page = int(request.url.params["page"])
+        return httpx.Response(
+            200, json={"totalCount": 3 if page == 1 else 2, "data": [{"pbanc_sn": page}]}
+        )
+
+    assert run_fetch(fetch_args(pages=2), client_factory=make_factory(handler)) == 0
+    run = json.loads((tmp_path / "data/run_manifest.json").read_text(encoding="utf-8"))["runs"][0]
+    assert run["status"] == "partial"
+
+
 def test_fetch_pages_stops_on_empty_page(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
     monkeypatch.chdir(tmp_path)
@@ -793,3 +870,44 @@ def test_evaluate_since_accepts_iso_datetime(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "가상 공고" in out
     assert "2000-01-01T09:00:00 이후 신규" in out
+
+
+def test_zero_result_replaces_old_reports_before_mail(tmp_path, monkeypatch):
+    from grant_radar.config import MailSettings
+    from grant_radar.notify.mail import build_report_message
+
+    monkeypatch.setenv(API_KEY_ENV_VAR, FAKE_KEY)
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+    run_fetch(fetch_args(no_save=True), client_factory=make_factory(_two_items_one_closed()))
+    command = ["evaluate", "--report", "reports/day.md", "--json", "reports/day.json"]
+    assert main(command) == 0
+    assert json.loads(Path("reports/day.json").read_text(encoding="utf-8"))["summary"]["total"] == 2
+    assert main(command + ["--since", "2999-01-01"]) == 0
+    result = json.loads(Path("reports/day.json").read_text(encoding="utf-8"))
+    assert result["summary"]["total"] == 0
+    assert result["results"] == []
+    markdown = Path("reports/day.md").read_text(encoding="utf-8")
+    assert "- 결과 건수: 0" in markdown
+    assert "모집 중 가상 공고" not in markdown
+    message = build_report_message(
+        MailSettings("a@example.test", "fake", "b@example.test"),
+        "2026-09-28",
+        Path("reports/day.md"),
+        Path("reports/day.json"),
+    )
+    assert "대상 공고 없음" in message["Subject"]
+    attachments = list(message.iter_attachments())
+    assert len(attachments) == 2
+    assert json.loads(attachments[1].get_payload(decode=True))["results"] == []
+
+
+def test_empty_database_writes_explicit_zero_reports(tmp_path, monkeypatch):
+    from grant_radar.storage.sqlite import AnnouncementStore
+
+    monkeypatch.chdir(tmp_path)
+    prepare_project_files(tmp_path)
+    with AnnouncementStore("data/announcements.db"):
+        pass
+    assert main(["evaluate", "--report", "zero.md", "--json", "zero.json"]) == 0
+    assert json.loads(Path("zero.json").read_text(encoding="utf-8"))["summary"]["total"] == 0

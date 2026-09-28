@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+import pytest
 from tests.test_normalization import full_item
 
 from grant_radar.normalization.kstartup import normalize_announcement
@@ -21,6 +22,37 @@ def ann(**overrides):
 
 
 class TestUpsert:
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            {"biz_trgt_age": "만 40세 이상"},
+            {"biz_enyy": "예비창업자"},
+            {"aply_trgt": "대학생"},
+            {"supt_biz_clsfc": "인력"},
+        ],
+    )
+    def test_eligibility_and_category_changes_are_recorded(self, changed):
+        with make_store() as store:
+            store.upsert(ann(), SEEN_AT)
+            assert store.upsert(ann(**changed), LATER) == "UPDATED"
+            row = store.get("kstartup", "900001")
+            assert row["last_changed_at"] == LATER.isoformat()
+            assert row["previous_hash"] == content_hash(ann())
+
+    @pytest.mark.parametrize("changed", [False, True])
+    def test_existing_hash_upgrade_compares_saved_content(self, changed):
+        with make_store() as store:
+            store.upsert(ann(), SEEN_AT)
+            store._conn.execute("UPDATE announcements SET content_hash = 'legacy-hash'")
+            store._conn.commit()
+            updated = ann(biz_trgt_age="만 40세 이상") if changed else ann()
+            assert store.upsert(updated, LATER) == ("UPDATED" if changed else "UNCHANGED")
+            row = store.get("kstartup", "900001")
+            assert row["content_hash"] == content_hash(updated)
+            assert row["first_seen_at"] == SEEN_AT.isoformat()
+            assert row["last_changed_at"] == (LATER.isoformat() if changed else None)
+            assert row["previous_hash"] == (content_hash(ann()) if changed else None)
+
     def test_first_time_is_new(self):
         with make_store() as store:
             assert store.upsert(ann(), SEEN_AT) == "NEW"

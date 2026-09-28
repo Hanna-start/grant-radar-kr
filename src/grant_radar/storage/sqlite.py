@@ -23,7 +23,7 @@ from typing import Self
 
 from grant_radar.models.announcement import NormalizedAnnouncement
 
-# 변경 감지 대상 주요 필드 (지시서 12절의 해시 대상 후보를 그대로 사용).
+# 변경 감지는 공고 주요 내용과 판정·관련도 입력 필드를 포함한다.
 # 날짜는 파싱 결과가 아닌 원본 문자열(raw)을 사용해 원천 데이터의 변화를 그대로 감지한다.
 CREATE_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS announcements (
@@ -43,17 +43,30 @@ CREATE TABLE IF NOT EXISTS announcements (
 
 def content_hash(announcement: NormalizedAnnouncement) -> str:
     """정규화된 주요 필드의 SHA-256 해시."""
+    return _hash_normalized(dataclasses.asdict(announcement))
+
+
+def _hash_normalized(data: dict) -> str:
+    """저장된 스냅샷도 현재 필드 집합으로 비교해 해시 확장 자체를 변경으로 세지 않는다."""
     payload = {
-        "title": announcement.title,
-        "summary": announcement.summary,
-        "target_description": announcement.target_description,
-        "excluded_target_description": announcement.excluded_target_description,
-        "region": announcement.region,
-        "application_start_raw": announcement.application_start_at.raw,
-        "application_end_raw": announcement.application_end_at.raw,
-        "detail_url": announcement.detail_url,
-        "recruitment_open": announcement.recruitment_open,
+        key: data.get(key)
+        for key in (
+            "title",
+            "summary",
+            "support_category",
+            "target_description",
+            "excluded_target_description",
+            "region",
+            "detail_url",
+            "recruitment_open",
+            "business_age_conditions",
+            "applicant_age_conditions",
+            "applicant_categories",
+            "preferred_conditions",
+        )
     }
+    payload["application_start_raw"] = data["application_start_at"]["raw"]
+    payload["application_end_raw"] = data["application_end_at"]["raw"]
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
@@ -102,7 +115,7 @@ class AnnouncementStore:
         key = (announcement.source, announcement.source_id)
 
         row = self._conn.execute(
-            "SELECT content_hash FROM announcements WHERE source = ? AND source_id = ?",
+            "SELECT normalized_json FROM announcements WHERE source = ? AND source_id = ?",
             key,
         ).fetchone()
 
@@ -116,21 +129,22 @@ class AnnouncementStore:
             self._conn.commit()
             return "NEW"
 
-        if row["content_hash"] == new_hash:
-            # 주요 필드는 동일 — 최신 확인 시각과 본문만 갱신한다
+        old_hash = _hash_normalized(json.loads(row["normalized_json"]))
+        if old_hash == new_hash:
+            # 내용이 같으면 변경 이력을 유지하고 확장된 해시·확인 시각·본문만 갱신한다.
             self._conn.execute(
                 "UPDATE announcements SET last_seen_at = ?, normalized_json = ?,"
-                " raw_json = ? WHERE source = ? AND source_id = ?",
-                (seen, normalized_json, raw_json, *key),
+                " raw_json = ?, content_hash = ? WHERE source = ? AND source_id = ?",
+                (seen, normalized_json, raw_json, new_hash, *key),
             )
             self._conn.commit()
             return "UNCHANGED"
 
         self._conn.execute(
-            "UPDATE announcements SET previous_hash = content_hash, content_hash = ?,"
+            "UPDATE announcements SET previous_hash = ?, content_hash = ?,"
             " last_changed_at = ?, last_seen_at = ?, normalized_json = ?, raw_json = ?"
             " WHERE source = ? AND source_id = ?",
-            (new_hash, seen, seen, normalized_json, raw_json, *key),
+            (old_hash, new_hash, seen, seen, normalized_json, raw_json, *key),
         )
         self._conn.commit()
         return "UPDATED"
