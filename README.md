@@ -52,12 +52,21 @@ K-Startup과 기업마당의 공개 지원사업 공고를 수집·정규화해 
 
 ## 데이터 원천
 
-- 공공데이터포털: 창업진흥원_K-Startup(사업소개, 사업공고, 콘텐츠 등)_조회서비스
-- 엔드포인트: `GET https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01`
+| 원천 | 공식 API 상세·활용 신청 | 사용하는 엔드포인트 |
+|---|---|---|
+| K-Startup | [창업진흥원 K-Startup 조회서비스](https://www.data.go.kr/data/15125364/openapi.do) | `https://apis.data.go.kr/B552735/kisedKstartupService01/getAnnouncementInformation01` |
+| 기업마당 | [중소벤처기업부 중소기업 지원사업 공고 조회 서비스](https://www.data.go.kr/data/15157820/openapi.do) | `https://apis.data.go.kr/1421000/bizinfo/pblancBsnsService` |
 
 ## 설치
 
-Python 3.12 이상이 필요합니다.
+Python 3.12 이상이 필요합니다. Git으로 내려받고 저장소 폴더로 이동합니다.
+
+```powershell
+git clone https://github.com/Hanna-start/grant-radar-kr.git
+cd grant-radar-kr
+```
+
+이미 내려받았다면 `pyproject.toml`과 `README.md`가 있는 폴더에서 다음을 실행합니다.
 
 ```powershell
 python -m venv .venv
@@ -68,7 +77,7 @@ python -m venv .venv
 
 ## 설정 (.env)
 
-1. [공공데이터포털](https://www.data.go.kr)에서 위 서비스의 활용 신청을 하고
+1. 위 표의 공식 API 페이지에서 사용할 원천별로 활용 신청을 하고
    **일반 인증키(Decoding)** 값을 발급받습니다.
 2. `.env.example`을 `.env`로 복사한 뒤 인증키를 입력합니다.
 
@@ -108,6 +117,10 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 수집만 원하는 경우 여기까지 실행하면 됩니다. 결과는
 `data/announcements.db`에 누적되며 회사 프로필이나 메일 설정은 필요하지 않습니다.
 각 실행의 수집 범위와 종료 상태는 `data/run_manifest.json`에 기록됩니다.
+`partial`은 부분 수집이며 전체 공고를 받았다는 뜻이 아닙니다. 요청한 시작 페이지,
+마지막 응답 페이지와 실제 수집 건수가 기록됩니다. 중간 페이지부터 시작하면
+마지막 페이지에 도달해도 `complete`로 표시하지 않습니다.
+성공 종료 코드 `0`은 요청 범위의 정상 처리이며, 전체 수집 여부는 매니페스트로 확인합니다.
 
 수집 원천은 `--source`로 선택합니다. 기본은 K-Startup(창업지원)이고,
 `bizinfo`는 기업마당(중소기업 지원사업 — 인력·금융 분야 포함)입니다.
@@ -139,7 +152,10 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 - `--new-only` (run 전용): 이번 실행에서 처음 관측된 공고만 보고
 - `--report PATH`: 판정 보고서를 Markdown 파일로 저장 (`reports/`는 Git 제외)
 
-실무용 (두 원천 수집 후 모집 중·신규만 보고):
+조건에 맞는 공고가 0건이어도 `--report`와 `--json`으로 지정한 파일을 새로 씁니다.
+같은 경로를 다시 사용하면 이전 결과 대신 이번 0건 결과가 남습니다.
+
+실무용 예시 (지정한 페이지 범위 수집 후 모집 중·신규만 보고):
 
 ```powershell
 .venv\Scripts\python.exe -m grant_radar fetch --per-page 100 --pages 3
@@ -148,11 +164,19 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 
 ## 선택 기능: 정기 실행과 메일 보고
 
-실행 경로에 언어모델·외부 서비스가 없습니다. Windows 작업 스케줄러가
+실행 시 언어모델을 호출하지 않습니다. 공고 수집에는 공공 API, 메일 발송에는
+설정한 SMTP 서버를 사용합니다. Windows 작업 스케줄러가
 `scripts/weekly_run.ps1`을 호출하고, 스크립트는 K-Startup·기업마당 수집 →
 지난 실행 이후 신규·모집 중 공고 판정 → 보고서 메일 발송 순으로 돌며, 세 단계가
 모두 성공했을 때만 `data/last_success.txt`(다음 실행의 `--since` 기준)를 갱신합니다.
-실패한 주는 기준이 갱신되지 않아 다음 실행이 그 기간을 자동으로 다시 수집합니다.
+실패한 주는 기준이 갱신되지 않아 다음 평가에도 이전 기준 이후의 신규 공고가 포함됩니다.
+수집 페이지 수 자체가 늘어나거나 누락된 모든 기간을 자동으로 복구하는 것은 아닙니다.
+
+기본 수집 범위는 K-Startup 3페이지, 기업마당 17페이지이며 페이지당 100건을 요청합니다.
+**전체 공고 수집이나 신규 공고의 무누락을 보장하지 않습니다.** `partial`인 원천은
+로그와 메일 본문에 수집 범위를 적고 메일 제목에 `[주의]`를 붙입니다. 부분 수집도
+선택 범위 보고·발송이 성공하면 기준 시각을 갱신합니다. 전체 수집이 필요하면
+`scripts/weekly_run.ps1`의 페이지 한도를 조정하고 매니페스트를 확인하세요.
 
 `data/company.json`과 `data/company_*.json`을 자동으로 찾아 같은 공고를 각 회사
 기준으로 판정하고, **한 통의 메일에 회사별 절을 나눠** 담습니다(추가 API 호출 없음).
@@ -160,11 +184,15 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 
 1. `.env`에 메일 설정을 추가합니다 (`.env.example` 참고). `SMTP_PASSWORD`는 Google
    계정의 **앱 비밀번호**(2단계 인증 필요)이며 계정 비밀번호가 아닙니다.
-2. 메일 설정만 먼저 확인하려면 기존 보고서로 한 번 보내 봅니다:
+2. 저장된 공고로 보고서를 생성한 뒤 메일 설정을 확인합니다 (아래 `mail`은 실제 발송):
 
    ```powershell
-   .venv\Scripts\python.exe -m grant_radar mail --report reports\report-open-20260822.md
+   .venv\Scripts\python.exe -m grant_radar evaluate --report reports\report.md --json reports\report.json
+   .venv\Scripts\python.exe -m grant_radar mail --report reports\report.md --json reports\report.json
    ```
+
+   지정한 보고서나 JSON 파일이 없으면 발송하지 않고 오류로 종료합니다.
+   파일 부재를 ‘신규 공고 없음’으로 해석하지 않습니다. 0건 보고서는 ‘대상 공고 없음’으로 보냅니다.
 
 3. 작업을 등록합니다 (한 번만, 사용자 본인이 실행):
 
@@ -187,7 +215,9 @@ KSTARTUP_API_KEY=발급받은_일반_인증키_Decoding_값
 .venv\Scripts\python.exe -m pytest
 ```
 
-모든 테스트는 모의(Mock) HTTP 응답을 사용하며 실제 API를 호출하지 않습니다.
+테스트는 모의(Mock) HTTP·SMTP를 사용하며 실제 API 호출이나 메일 발송을 하지 않습니다.
+PowerShell이 있으면 주간 스크립트도 CLI 대역으로 실행해 부분 수집 경고와 실패 시
+기준 시각 보존을 확인합니다. CI는 Linux와 Windows에서 실행합니다.
 
 ## 재현성 검증 (같은 입력 → 같은 결론)
 
@@ -299,3 +329,8 @@ C는 제외가 아니라 배치이며 판정 결과는 바뀌지 않습니다.
 ## 라이선스
 
 [MIT License](LICENSE)
+
+MIT는 이 저장소의 코드에 적용됩니다. 수집한 공고 데이터의 이용 조건은 각 원천의
+공식 API 페이지를 확인하세요. 특히 [기업마당 API](https://www.data.go.kr/data/15157820/openapi.do)는
+2026-09-28 확인 기준 ‘공공저작물 출처표시·변경금지(제3유형)’로 안내되어 있습니다.
+공개 콘텐츠의 예시는 저장소에 동봉한 가상 데이터를 사용하세요.
