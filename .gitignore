@@ -35,3 +35,7 @@ data/last_success.txt
 # 로컬 작업 지침·세션 로그 - 공개 저장소에 포함하지 않는다
 CLAUDE.md
 CONTEXT.md
+
+# Local web runtime
+.venv-web/
+.setup-*

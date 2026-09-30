@@ -1,0 +1,15 @@
+[server]
+address = "127.0.0.1"
+maxUploadSize = 10
+enableXsrfProtection = true
+enableCORS = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#547950"
+backgroundColor = "#faf9f5"
+secondaryBackgroundColor = "#eef4eb"
+textColor = "#293b2d"
+font = "sans serif"

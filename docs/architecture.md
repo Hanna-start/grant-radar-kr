@@ -111,3 +111,14 @@ K-Startup API ─→ api.kstartup.KStartupClient ─→ FetchResult
 - 지원사업 자동 신청
 - 공고 첨부파일 전문 수집·해석
 - 법적·공식 자격 확정
+
+
+## 선택형 로컬 웹 입력
+
+- start-web.cmd → scripts/start_web.ps1 → 별도 .venv-web → Streamlit(127.0.0.1).
+- registration.py: pypdf 텍스트 추출, 필요 시 PDFium 렌더링과 Tesseract 한국어 OCR. 결과는 미확인 제안이며 사용자 확인 전 저장하지 않는다. 개업일·법인설립일은 자동으로 합치지 않는다.
+- web_app.py: 회사 입력, 연결 설정, 보고서 미리보기·발송, Windows 예약 관리.
+- local_setup.py: 입력 검증·원자적 저장, 환경변수 자격증명을 제거한 별도 CLI 프로세스 실행, 범위 경고 전달, SMTP 발송. 판정 규칙은 기존 엔진을 사용한다.
+- scripts/local_task.ps1: 폴더별 이름의 작업을 관리하고 기존 weekly_run.ps1에 PythonPath를 전달한다. 사용자 클릭 전 메일 발송이나 예약 등록은 없다.
+- 데모는 reports/demo-*의 별도 회사·DB로 실행하며 실제 회사와 운영 DB에 섞이지 않는다.
+- .env는 암호화하지 않은 로컬 설정이다. 원본 등록증을 장기 보관하거나 메일 첨부하지 않는다. 상세 입력·처리 범위는 quickstart.md를 참고한다.

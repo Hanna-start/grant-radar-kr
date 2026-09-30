@@ -2,13 +2,20 @@
 # 공고는 원천별로 한 번만 수집하고, 발견된 회사 프로필마다 별도로 판정해 한 통의 메일로 보낸다.
 # 회사 프로필: data/company.json, data/company_*.json. 둘 다 없으면 가상 샘플을 사용한다.
 
+param([string]$PythonPath = "")
 $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-$Py = Join-Path $Root ".venv\Scripts\python.exe"
+$Py = if ($PythonPath) { $PythonPath } else { Join-Path $Root ".venv\Scripts\python.exe" }
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONUTF8 = "1"
+# Local web settings come from this folder's .env, not unrelated inherited credentials.
+if ($PythonPath) {
+    foreach ($Name in @("KSTARTUP_API_KEY", "SMTP_USER", "SMTP_PASSWORD", "REPORT_MAIL_TO", "SMTP_HOST", "SMTP_PORT")) {
+        [Environment]::SetEnvironmentVariable($Name, $null, "Process")
+    }
+}
 $StartedAt = Get-Date
 $Stamp = $StartedAt.ToString("yyyyMMdd")
 $RunDate = $StartedAt.ToString("yyyy-MM-dd")
